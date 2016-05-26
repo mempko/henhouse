@@ -70,27 +70,25 @@ namespace flyfish
     };
 
     const std::size_t FRAME_SIZE = 4096;
-    const std::size_t NUM_FRAMES = FRAME_SIZE / sizeof(count_type); 
     const std::uint64_t DEFAULT_RESOLUTION = 100;
     const std::size_t INDEX_SIZE = 4096;
 
-    class index
+    template<class meta_t, class data_t>
+    class mapped_vector
     {
         public:
-            index(){};
-            index(const bf::path& meta_file, const bf::path& data_file) 
+            mapped_vector(){};
+            mapped_vector(const bf::path& meta_file, const bf::path& data_file) 
             {
                 //open index metadata
-                _metadata = open_as<index_metadata>(_meta_file, meta_file);
-                if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
-                _range_size = FRAME_SIZE * _metadata->resolution;
+                _metadata = open_as<meta_t>(_meta_file, meta_file);
 
                 //open index data. New file size is INDEX_SIZE
                 open(_data_file, data_file, INDEX_SIZE);
-                _items = reinterpret_cast<index_item*>(_data_file.data());
+                _items = reinterpret_cast<data_t*>(_data_file.data());
 
                 //compute max elements
-                _max_items = _data_file.size() / sizeof(index_item);
+                _max_items = _data_file.size() / sizeof(data_t);
                 CHECK_LESS_EQUAL(_metadata->size, _max_items);
 
                 ENSURE(_metadata != nullptr);
@@ -102,6 +100,39 @@ namespace flyfish
                 REQUIRE(_metadata)
                 ENSURE_LESS_EQUAL(_metadata->size, _max_items);
                 return _metadata->size;
+            }
+
+            data_t get(size_t pos) const 
+            {
+                REQUIRE(_metadata); 
+                REQUIRE(_items); 
+                REQUIRE_LESS(pos, _metadata->size);
+
+                return _items[pos];
+            }
+
+        protected:
+            meta_t* _metadata = nullptr;
+            data_t* _items = nullptr;
+            std::size_t _max_items = 0;
+            bio::mapped_file _meta_file;
+            bio::mapped_file _data_file;
+    };
+
+    class index : public mapped_vector<index_metadata, index_item>
+    {
+        public:
+            index(){};
+            index(const bf::path& meta_file, const bf::path& data_file) :
+                mapped_vector{meta_file, data_file}
+            {
+                REQUIRE(_metadata);
+
+                if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
+                _range_size = FRAME_SIZE * _metadata->resolution;
+
+                ENSURE(_metadata != nullptr);
+                ENSURE(_items != nullptr);
             }
 
             index_item find_range(time_type t) const 
@@ -127,9 +158,7 @@ namespace flyfish
                     const auto pos = _metadata->size - 1;
                     const auto latest_time = _items[pos].time;
 
-                    //check if we need new range, otherwise break
-                    if(t < latest_time) return false; 
-                    if((t - latest_time) < _range_size) return false;
+                    //check if we need new range, otherwise break if(t < latest_time) return false; if((t - latest_time) < _range_size) return false;
 
                     //determine next range
                     next_pos = pos + 1;
@@ -145,12 +174,7 @@ namespace flyfish
             }
 
         private:
-            index_metadata* _metadata = nullptr;
-            index_item* _items = nullptr;
-            std::size_t _max_items = 0;
             std::size_t _range_size = 0;
-            bio::mapped_file _meta_file;
-            bio::mapped_file _data_file;
     };
 
     using key_t = std::string;
@@ -169,50 +193,18 @@ namespace flyfish
 
     //TODO: pull out new 'mapped_vector' which stores vectored data
     //Should support resizing and remapping
-    class data
+    class data : public mapped_vector<data_metadata, data_item>
     {
         public:
             data(){}
-            data(const bf::path& meta_file, const bf::path& data_file)
+            data(const bf::path& meta_file, const bf::path& data_file) :
+                mapped_vector{meta_file, data_file}
             {
-                //open data metadata
-                _metadata = open_as<data_metadata>(_meta_file, meta_file);
-
-                //open data. New file size is DATA_SIZE
-                open(_data_file, data_file, DATA_SIZE);
-                _items = reinterpret_cast<data_item*>(_data_file.data());
-
-                //compute max elements
-                _max_items = _data_file.size() / sizeof(data_item);
-                CHECK_LESS_EQUAL(_metadata->size, _max_items);
-
                 ENSURE(_metadata != nullptr);
                 ENSURE(_items != nullptr);
             }
 
-            std::uint64_t size() const 
-            {
-                REQUIRE(_metadata); 
-                ENSURE_LESS_EQUAL(_metadata->size, _max_items); 
-                return _metadata->size;
-            }
-
-            data_item get(size_t pos) const 
-            {
-                REQUIRE(_metadata); 
-                REQUIRE(_items); 
-                REQUIRE_LESS(pos, _metadata->size);
-
-                return _items[pos];
-            }
-
-
         private:
-            data_metadata* _metadata = nullptr;
-            data_item* _items = nullptr;
-            std::size_t _max_items = 0;
-            bio::mapped_file _meta_file;
-            bio::mapped_file _data_file;
     };
 
     struct time_db
