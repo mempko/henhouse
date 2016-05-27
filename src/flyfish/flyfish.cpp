@@ -25,9 +25,6 @@ namespace flyfish
         if(bf::exists(path)) 
         {
             file.open(path);
-
-            std::cerr << "opened: " << path << std::endl;
-            std::cerr << "size: " << file.size() << std::endl;
         }
         else 
         {
@@ -35,9 +32,6 @@ namespace flyfish
             p.path = path.string();
             p.new_file_size = new_size;
             p.flags = bio::mapped_file::readwrite;
-
-            std::cerr << "creating: " << path << std::endl;
-            std::cerr << "size: " << p.new_file_size << std::endl;
 
             file.open(p);
         }
@@ -56,6 +50,150 @@ namespace flyfish
             return reinterpret_cast<T*>(file.data());
         }
 
+    const std::size_t DEFAULT_NEW_SIZE = 4096;
+
+    template<class meta_t, class data_type>
+    class mapped_vector
+    {
+        public:
+            mapped_vector(){};
+            mapped_vector(
+                    const bf::path& meta_file, 
+                    const bf::path& data_file, 
+                    const int new_size = DEFAULT_NEW_SIZE) 
+            {
+                //open index metadata
+                _metadata = open_as<meta_t>(_meta_file, meta_file);
+
+                //open index data. New file size is new_size
+                open(_data_file, data_file, new_size);
+                _items = reinterpret_cast<data_type*>(_data_file.data());
+
+                //compute max elements
+                _max_items = _data_file.size() / sizeof(data_type);
+                CHECK_LESS_EQUAL(_metadata->size, _max_items);
+
+                ENSURE(_metadata != nullptr);
+                ENSURE(_items != nullptr);
+            }
+
+            meta_t& meta() 
+            {
+                REQUIRE(_metadata);
+                return *_metadata;
+            }
+
+            const meta_t& meta() const
+            {
+                REQUIRE(_metadata);
+                return *_metadata;
+            }
+
+            std::uint64_t size() const 
+            {
+                REQUIRE(_metadata)
+                ENSURE_LESS_EQUAL(_metadata->size, _max_items);
+                return _metadata->size;
+            }
+
+            const data_type& operator[](size_t pos) const 
+            {
+                REQUIRE(_metadata); 
+                REQUIRE(_items); 
+                REQUIRE_LESS(pos, _metadata->size);
+
+                return _items[pos];
+            }
+
+            data_type& operator[](size_t pos)
+            {
+                REQUIRE(_metadata); 
+                REQUIRE(_items); 
+                REQUIRE_LESS(pos, _metadata->size);
+
+                return _items[pos];
+            }
+
+            void push_back(const data_type& v) 
+            {
+                REQUIRE(_metadata);
+                const auto next_pos = _metadata->size;
+
+                //TODO: RESIZE index file if we reach end
+                CHECK_LESS(next_pos, _max_items);
+
+                _items[next_pos] = v;
+                _metadata->size++;
+            }
+
+            data_type* begin() 
+            { 
+                REQUIRE(_items);
+                return _items;
+            }
+
+            data_type* end() 
+            { 
+                REQUIRE(_items);
+                REQUIRE(_metadata);
+                return _items + size();
+            }
+
+            data_type* begin() const
+            { 
+                REQUIRE(_items);
+                return _items;
+            }
+
+            data_type* end() const
+            { 
+                REQUIRE(_items);
+                REQUIRE(_metadata);
+                return _items + size();
+            }
+
+            const data_type* cbegin() { return begin(); }
+            const data_type* cend() { return end(); }
+            const data_type* cbegin() const { return begin(); }
+            const data_type* cend() const { return end(); }
+
+            data_type& front()
+            {
+                REQUIRE(_items);
+                return *_items;
+            }
+
+            const data_type& front() const
+            {
+                REQUIRE(_items);
+                return *_items;
+            }
+
+            data_type& back()
+            {
+                REQUIRE(_items);
+                REQUIRE(_metadata);
+                REQUIRE_GREATER(_metadata->size, 0);
+                return *(_items + (_metadata->size-1));
+            }
+
+            const data_type& back() const
+            {
+                REQUIRE(_items);
+                REQUIRE(_metadata);
+                REQUIRE_GREATER(_metadata->size, 0);
+                return *(_items + (_metadata->size-1));
+            }
+
+
+        protected:
+            meta_t* _metadata = nullptr;
+            data_type* _items = nullptr;
+            std::size_t _max_items = 0;
+            bio::mapped_file _meta_file;
+            bio::mapped_file _data_file;
+    };
+
 
     struct index_item
     {
@@ -73,106 +211,54 @@ namespace flyfish
     const std::uint64_t DEFAULT_RESOLUTION = 100;
     const std::size_t INDEX_SIZE = 4096;
 
-    template<class meta_t, class data_t>
-    class mapped_vector
+    struct pos_result
     {
-        public:
-            mapped_vector(){};
-            mapped_vector(const bf::path& meta_file, const bf::path& data_file) 
-            {
-                //open index metadata
-                _metadata = open_as<meta_t>(_meta_file, meta_file);
-
-                //open index data. New file size is INDEX_SIZE
-                open(_data_file, data_file, INDEX_SIZE);
-                _items = reinterpret_cast<data_t*>(_data_file.data());
-
-                //compute max elements
-                _max_items = _data_file.size() / sizeof(data_t);
-                CHECK_LESS_EQUAL(_metadata->size, _max_items);
-
-                ENSURE(_metadata != nullptr);
-                ENSURE(_items != nullptr);
-            }
-
-            std::uint64_t size() const 
-            {
-                REQUIRE(_metadata)
-                ENSURE_LESS_EQUAL(_metadata->size, _max_items);
-                return _metadata->size;
-            }
-
-            data_t get(size_t pos) const 
-            {
-                REQUIRE(_metadata); 
-                REQUIRE(_items); 
-                REQUIRE_LESS(pos, _metadata->size);
-
-                return _items[pos];
-            }
-
-        protected:
-            meta_t* _metadata = nullptr;
-            data_t* _items = nullptr;
-            std::size_t _max_items = 0;
-            bio::mapped_file _meta_file;
-            bio::mapped_file _data_file;
+        index_item range;
+        offset_type offset;
+        offset_type pos;
     };
 
-    class index : public mapped_vector<index_metadata, index_item>
+    class index_type : public mapped_vector<index_metadata, index_item>
     {
         public:
-            index(){};
-            index(const bf::path& meta_file, const bf::path& data_file) :
-                mapped_vector{meta_file, data_file}
+            index_type() : mapped_vector{} {};
+            index_type(const bf::path& meta_file, const bf::path& data_file) :
+                mapped_vector{meta_file, data_file, INDEX_SIZE}
             {
                 REQUIRE(_metadata);
 
                 if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
-                _range_size = FRAME_SIZE * _metadata->resolution;
-
-                ENSURE(_metadata != nullptr);
-                ENSURE(_items != nullptr);
+                _range_size = bucket_size() * _metadata->resolution;
             }
+
+            std::size_t range_size() const { return _range_size;}
+            std::size_t bucket_size() const { return FRAME_SIZE;}
 
             index_item find_range(time_type t) const 
             {
                 REQUIRE(_metadata);
                 REQUIRE(_items);
 
-                const auto end = _items + _metadata->size;
-                auto r = std::upper_bound(_items, end, t, 
+                auto r = std::upper_bound(cbegin(), cend(), t, 
                         [](time_type l, const auto& r) { return l < r.time;});
 
-                return r != _items ? *(r - 1) : *_items;
+                return r != cbegin() ? *(r - 1) : front();
             }
-            
-            bool index_offset(time_type t, offset_type o) 
+
+            pos_result find_pos(time_type t) const
             {
                 REQUIRE(_metadata);
-                REQUIRE(_items);
+                if(size() == 0) return pos_result {index_item { t, 0}, 0, 0};
 
-                auto next_pos = 0;
-                if(_metadata->size > 0) 
-                {
-                    const auto pos = _metadata->size - 1;
-                    const auto latest_time = _items[pos].time;
+                const auto range = find_range(t);
+                t = std::max(t, range.time);
 
-                    //check if we need new range, otherwise break if(t < latest_time) return false; if((t - latest_time) < _range_size) return false;
-
-                    //determine next range
-                    next_pos = pos + 1;
-                    //TODO: RESIZE index file if we reach end
-                    CHECK_LESS(next_pos, _max_items);
-                } 
-
-                index_item i = {t, o};
-                _items[next_pos] = i;
-                _metadata->size++;
-
-                return true;
+                const auto offset_time = t - range.time;
+                const auto offset = offset_time / _metadata->resolution;
+                return pos_result{ range, offset, range.pos + offset};
             }
 
+            
         private:
             std::size_t _range_size = 0;
     };
@@ -187,36 +273,102 @@ namespace flyfish
     struct data_item
     {
         count_type value = 0;
+        count_type total = 0;
+        count_type integral = 0;
     };
 
-    const std::size_t DATA_SIZE = 4096;
+    const std::size_t DATA_SIZE = 4096000;
 
-    //TODO: pull out new 'mapped_vector' which stores vectored data
-    //Should support resizing and remapping
-    class data : public mapped_vector<data_metadata, data_item>
+    using data_type = mapped_vector<data_metadata, data_item>;
+
+    void propogate(const data_item& prev, data_item& current)
     {
-        public:
-            data(){}
-            data(const bf::path& meta_file, const bf::path& data_file) :
-                mapped_vector{meta_file, data_file}
-            {
-                ENSURE(_metadata != nullptr);
-                ENSURE(_items != nullptr);
-            }
+        current.total = prev.total + current.value;
+        const auto change = current.value - prev.value;
+        current.integral = prev.integral + change;
+    }
 
-        private:
-    };
+    void update_current(const data_item& prev, data_item& current, count_type c)
+    {
+        current.value += c;
+        propogate(prev, current);
+    }
+
+    data_item diff_buckets(const data_item& a, const data_item& b, std::size_t n)
+    {
+        const auto total = b.total - a.total;
+        const auto avg = n > 0 ? total / n : a.value;
+        return data_item { 
+            avg, 
+            b.total - a.total, 
+            b.integral - a.integral};
+    }
 
     struct time_db
     {
         key_t key;
-        index idx;
+        index_type index;
+        data_type data;
 
-        data count;
-        data total;
-        data integral;
+        bool append(time_type t, count_type c)
+        {
+            const auto resolution = index.meta().resolution;
+            auto r = index.find_pos(t);
+
+            //if we move beyond end, append data 
+            if(r.pos >= data.size())
+            {
+                r.pos = data.size();
+                const auto prev = data.size() > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
+                data_item current = { c, 0, 0 };
+                propogate(prev, current);
+                data.push_back(current);
+                
+                //index only if the offset is bigger than the frame size.
+                if(index.size() == 0 || r.offset >= FRAME_SIZE) 
+                {
+                    const auto aliased_time = r.range.time + (r.offset * resolution);
+                    index_item index_entry = {aliased_time, r.pos};
+                    index.push_back(index_entry);
+                }
+            }
+            //otherwise bucket is current or in the past, no need to index.
+            else
+            {
+                CHECK_GREATER(data.size(), 0);
+
+                const auto prev = r.pos > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
+                update_current(prev, data[r.pos], c);
+                for(auto p = r.pos + 1; p < data.size(); p++)
+                    propogate(data[p-1], data[p]);
+            }
+
+            return true;
+        }
+
+        const data_item& get(time_t t) const  
+        {
+            const auto r = index.find_pos(t);
+            REQUIRE_RANGE(r.pos, 0, data.size());
+            return data[r.pos];
+        }
+
+        data_item diff(time_type a, time_type b) 
+        {
+            if(a > b) std::swap(a,b);
+            if(data.size() == 0) return data_item { 0, 0, 0};
+
+            auto ar = index.find_pos(a);
+            auto br = index.find_pos(b);
+
+            ar.pos = std::max<offset_type>(0, ar.pos);
+            br.pos = std::min<offset_type>(data.size() - 1, br.pos);
+
+            const auto& ad = data[ar.pos]; 
+            const auto& bd = data[br.pos]; 
+            return diff_buckets(ad, bd, br.pos - ar.pos);
+        }
     };
-
 
     time_db from_directory(const std::string& path) 
     {
@@ -225,14 +377,17 @@ namespace flyfish
     
         bf::path root = path;
 
-
         time_db db;
         db.key = root.filename().string();
 
-        bf::path imeta = root / "imeta";
-        bf::path idata = root / "idata";
-        db.idx = index(imeta, idata);
+        bf::path idx_meta = root / "im";
+        bf::path idx_data = root / "id";
+        db.index = index_type{idx_meta, idx_data};
+        
+        bf::path cmeta = root / "m";
+        bf::path cdata = root / "d";
 
+        db.data = data_type{cmeta, cdata, DATA_SIZE};
         
         return db;
     }
@@ -242,12 +397,47 @@ int main(int argc, char** argv)
 try
 {
     auto db = flyfish::from_directory("./tmp");
-    db.idx.index_offset(10, 10);
-    db.idx.index_offset(1000000, 20);
-    db.idx.index_offset(20000000, 30);
-    db.idx.index_offset(40000000, 50);
-    auto p = db.idx.find_range(10000000);
-    std::cout << "found: " << p.pos << std::endl;
+
+    int tm = 0;
+
+    const int TOTAL = 1000000;
+    const int TIME_INC = 10;
+    const int CHANGE = 2;
+
+    if(db.data.size() == 0)
+    {
+        for(int a = 0; a < TOTAL; a++)
+        {
+            tm += TIME_INC;
+            db.append(tm, 1);
+        }
+    }
+    else
+    {
+        tm = TOTAL * TIME_INC;
+    }
+
+    auto d = db.diff(0, tm);
+    auto h = db.get(tm/2);
+    auto q = db.get(tm/4);
+    auto d2 = db.diff(tm/2, tm/4);
+
+
+    std::cout << "half val: " << h.value << std::endl;
+    std::cout << "half total: " << h.total << std::endl;
+    std::cout << "half integral: " << h.integral << std::endl;
+
+    std::cout << "diff avg: " << d.value << std::endl;
+    std::cout << "diff total: " << d.total << std::endl;
+    std::cout << "diff integral: " << d.integral << std::endl;
+
+    std::cout << "diff2 avg: " << d2.value << std::endl;
+    std::cout << "diff2 total: " << d2.total << std::endl;
+    std::cout << "diff2 integral: " << d2.integral << std::endl;
+
+    std::cout << "ranges: " << db.index.size() << std::endl;
+    std::cout << "buckets: " << db.data.size() << std::endl;
+
 
     return 0;
 }
