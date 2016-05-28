@@ -9,6 +9,7 @@
 #include <exception>
 #include <algorithm>
 #include <fstream>
+#include <chrono>
 
 namespace bio = boost::iostreams;
 namespace bf =  boost::filesystem;
@@ -17,6 +18,7 @@ namespace flyfish
 {
     using time_type = std::uint64_t;
     using count_type = std::uint64_t;
+    using change_type = std::int64_t;
     using offset_type = std::uint64_t;
 
     void open(bio::mapped_file& file, bf::path path, std::size_t new_size)
@@ -54,7 +56,8 @@ namespace flyfish
             return reinterpret_cast<T*>(file.data());
         }
 
-    const std::size_t DEFAULT_NEW_SIZE = 4096;
+    const std::size_t PAGE_SIZE = bio::mapped_file::alignment();
+    const std::size_t DEFAULT_NEW_SIZE = PAGE_SIZE;
 
     template<class meta_t, class data_type>
     class mapped_vector
@@ -64,7 +67,7 @@ namespace flyfish
             mapped_vector(
                     const bf::path& meta_file, 
                     const bf::path& data_file, 
-                    const int new_size = DEFAULT_NEW_SIZE) 
+                    const std::size_t new_size = DEFAULT_NEW_SIZE) 
             {
                 _data_file_path = data_file;
                 _new_size = new_size;
@@ -225,9 +228,8 @@ namespace flyfish
         std::uint64_t resolution = 0;
     };
 
-    const std::size_t FRAME_SIZE = 4096;
     const std::uint64_t DEFAULT_RESOLUTION = 100;
-    const std::size_t INDEX_SIZE = 4096;
+    const std::size_t INDEX_SIZE = PAGE_SIZE;
 
     struct pos_result
     {
@@ -246,11 +248,7 @@ namespace flyfish
                 REQUIRE(_metadata);
 
                 if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
-                _range_size = bucket_size() * _metadata->resolution;
             }
-
-            std::size_t range_size() const { return _range_size;}
-            std::size_t bucket_size() const { return FRAME_SIZE;}
 
             index_item find_range(time_type t) const 
             {
@@ -279,10 +277,6 @@ namespace flyfish
                 const auto range = find_range(t);
                 return find_pos(t, range);
             }
-
-            
-        private:
-            std::size_t _range_size = 0;
     };
 
     using key_t = std::string;
@@ -294,29 +288,29 @@ namespace flyfish
 
     struct data_item
     {
-        count_type value = 0;
-        count_type total = 0;
-        count_type integral = 0;
+        count_type value;
+        count_type total;
+        change_type integral;
     };
 
     const std::size_t DATA_SIZE = 4096000;
 
     using data_type = mapped_vector<data_metadata, data_item>;
 
-    void propogate(const data_item& prev, data_item& current)
+    void propogate(data_item prev, data_item& current)
     {
         current.total = prev.total + current.value;
         const auto change = current.value - prev.value;
         current.integral = prev.integral + change;
     }
 
-    void update_current(const data_item& prev, data_item& current, count_type c)
+    void update_current(data_item prev, data_item& current, count_type c)
     {
         current.value += c;
         propogate(prev, current);
     }
 
-    data_item diff_buckets(const data_item& a, const data_item& b, std::size_t n)
+    data_item diff_buckets(data_item a, data_item b, std::size_t n)
     {
         const auto total = b.total - a.total;
         const auto avg = n > 0 ? total / n : a.value;
@@ -326,6 +320,8 @@ namespace flyfish
             b.integral - a.integral};
     }
 
+    const std::size_t FRAME_SIZE = PAGE_SIZE / sizeof(data_item);
+
     struct timeline
     {
         key_t key;
@@ -334,43 +330,54 @@ namespace flyfish
 
         bool put(time_type t, count_type c)
         {
-            const auto resolution = index.meta().resolution;
-
-            //get last position only because we want to keep 
-            //a specific performance profile. This is a deliberate limitation.
-            auto r = index.size() > 0 ? 
-                index.find_pos(t, index.back()) : 
-                pos_result {index_item { t, 0}, 0, 0};
-
-            //don't add if time is before last range
-            if(t < r.range.time) return false;
-
-            //if we move beyond end, append data 
-            if(r.pos >= data.size())
+            if(index.size() > 0)
             {
-                r.pos = data.size();
-                const auto prev = data.size() > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
-                data_item current = { c, 0, 0 };
-                propogate(prev, current);
-                data.push_back(current);
-                
-                //index only if the offset is bigger than the frame size.
-                if(index.size() == 0 || r.offset >= FRAME_SIZE) 
+                const auto& last_range = index.back();
+
+                //don't add if time is before last range
+                if(t >= last_range.time) 
                 {
-                    const auto aliased_time = r.range.time + (r.offset * resolution);
-                    index_item index_entry = {aliased_time, r.pos};
-                    index.push_back(index_entry);
+                    //get last position only because we want to keep 
+                    //a specific performance profile. This is a deliberate limitation.
+                    auto r = index.find_pos(t, last_range);
+
+                    //if we move beyond end, append data 
+                    if(r.pos >= data.size())
+                    {
+                        r.pos = data.size();
+                        const auto prev = data[r.pos - 1];
+                        data_item current = { c, 0, 0 };
+                        propogate(prev, current);
+                        data.push_back(current);
+
+                        if(r.offset < FRAME_SIZE) return true;
+
+                        //index only if the offset is same or bigger than the frame size.
+                        const auto resolution = index.meta().resolution;
+                        const auto aliased_time = r.range.time + (r.offset * resolution);
+                        index_item index_entry = {aliased_time, r.pos};
+                        index.push_back(index_entry);
+                    }
+                    //otherwise bucket is current or in the past, no need to index.
+                    else
+                    {
+                        const auto prev = r.pos > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
+                        update_current(prev, data[r.pos], c);
+                        for(auto p = r.pos + 1; p < data.size(); p++)
+                            propogate(data[p-1], data[p]);
+                    }
                 }
+                else return false;
             }
-            //otherwise bucket is current or in the past, no need to index.
             else
             {
-                CHECK_GREATER(data.size(), 0);
+                CHECK_EQUAL(data.size(), 0);
 
-                const auto prev = r.pos > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
-                update_current(prev, data[r.pos], c);
-                for(auto p = r.pos + 1; p < data.size(); p++)
-                    propogate(data[p-1], data[p]);
+                data_item v{ c, 0, 0 };
+                data.push_back(v);
+
+                index_item i = {t, 0};
+                index.push_back(i);
             }
 
             return true;
@@ -386,7 +393,7 @@ namespace flyfish
         data_item diff(time_type a, time_type b) 
         {
             if(a > b) std::swap(a,b);
-            if(data.size() == 0) return data_item { 0, 0, 0};
+            if(data.size() == 0) return data_item{ 0, 0, 0};
 
             auto ar = index.find_pos(a);
             auto br = index.find_pos(b);
@@ -431,27 +438,42 @@ try
 {
     auto db = flyfish::from_directory("./tmp");
 
-    int tm = 0;
+    size_t tm = 0;
 
-    const int TOTAL = 100000000;
+    const size_t TOTAL = 1000000000;
     //const int TOTAL = 10000000;
-    const int TIME_INC = 10;
+    const size_t TIME_INC = 10;
     const int CHANGE = 2;
 
+    std::cout << std::fixed;
     if(db.data.size() == 0)
     {
+        auto start = std::chrono::high_resolution_clock::now();
         for(int a = 0; a < TOTAL; a++)
         {
             tm += TIME_INC;
             db.put(tm, 1);
         }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+        auto sec = duration / 1000000000.0;
+        std::cout <<  sec << " seconds" << std::endl;
+        std::cout << (TOTAL / sec) << " puts per second" << std::endl;
     }
     else
     {
         tm = TOTAL * TIME_INC;
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     auto d = db.diff(tm/2, tm/4);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
+    auto sec = duration / 1000000000.0;
+
+    std::cout << "query time: " << sec << "s" << std::endl;
 
     std::cout << "diff avg: " << d.value << std::endl;
     std::cout << "diff total: " << d.total << std::endl;
