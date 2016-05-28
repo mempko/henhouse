@@ -8,6 +8,7 @@
 #include <boost/filesystem.hpp>
 #include <exception>
 #include <algorithm>
+#include <fstream>
 
 namespace bio = boost::iostreams;
 namespace bf =  boost::filesystem;
@@ -35,6 +36,9 @@ namespace flyfish
 
             file.open(p);
         }
+
+        if(!file.is_open())
+            throw std::runtime_error{"unable to mmap " + path.string()};
     }
 
     template<class T>
@@ -62,6 +66,9 @@ namespace flyfish
                     const bf::path& data_file, 
                     const int new_size = DEFAULT_NEW_SIZE) 
             {
+                _data_file_path = data_file;
+                _new_size = new_size;
+
                 //open index metadata
                 _metadata = open_as<meta_t>(_meta_file, meta_file);
 
@@ -119,8 +126,8 @@ namespace flyfish
                 REQUIRE(_metadata);
                 const auto next_pos = _metadata->size;
 
-                //TODO: RESIZE index file if we reach end
-                CHECK_LESS(next_pos, _max_items);
+                if(next_pos >= _max_items)
+                    resize(_data_file.size() + _new_size);
 
                 _items[next_pos] = v;
                 _metadata->size++;
@@ -174,7 +181,7 @@ namespace flyfish
                 REQUIRE(_items);
                 REQUIRE(_metadata);
                 REQUIRE_GREATER(_metadata->size, 0);
-                return *(_items + (_metadata->size-1));
+                return *(_items + (_metadata->size - 1));
             }
 
             const data_type& back() const
@@ -182,7 +189,16 @@ namespace flyfish
                 REQUIRE(_items);
                 REQUIRE(_metadata);
                 REQUIRE_GREATER(_metadata->size, 0);
-                return *(_items + (_metadata->size-1));
+                return *(_items + (_metadata->size - 1));
+            }
+
+        private:
+
+            void resize(size_t new_size) 
+            {
+                _data_file.resize(new_size);
+                _items = reinterpret_cast<data_type*>(_data_file.data());
+                _max_items = _data_file.size() / sizeof(data_type);
             }
 
 
@@ -190,8 +206,10 @@ namespace flyfish
             meta_t* _metadata = nullptr;
             data_type* _items = nullptr;
             std::size_t _max_items = 0;
+            std::size_t _new_size = 0;
             bio::mapped_file _meta_file;
             bio::mapped_file _data_file;
+            bf::path _data_file_path;
     };
 
 
@@ -245,17 +263,21 @@ namespace flyfish
                 return r != cbegin() ? *(r - 1) : front();
             }
 
-            pos_result find_pos(time_type t) const
+            pos_result find_pos(time_type t, const index_item range) const
             {
                 REQUIRE(_metadata);
-                if(size() == 0) return pos_result {index_item { t, 0}, 0, 0};
 
-                const auto range = find_range(t);
                 t = std::max(t, range.time);
-
                 const auto offset_time = t - range.time;
                 const auto offset = offset_time / _metadata->resolution;
                 return pos_result{ range, offset, range.pos + offset};
+            }
+
+            pos_result find_pos(time_type t) const
+            {
+                if(size() == 0) return pos_result {index_item { t, 0}, 0, 0};
+                const auto range = find_range(t);
+                return find_pos(t, range);
             }
 
             
@@ -304,16 +326,24 @@ namespace flyfish
             b.integral - a.integral};
     }
 
-    struct time_db
+    struct timeline
     {
         key_t key;
         index_type index;
         data_type data;
 
-        bool append(time_type t, count_type c)
+        bool put(time_type t, count_type c)
         {
             const auto resolution = index.meta().resolution;
-            auto r = index.find_pos(t);
+
+            //get last position only because we want to keep 
+            //a specific performance profile. This is a deliberate limitation.
+            auto r = index.size() > 0 ? 
+                index.find_pos(t, index.back()) : 
+                pos_result {index_item { t, 0}, 0, 0};
+
+            //don't add if time is before last range
+            if(t < r.range.time) return false;
 
             //if we move beyond end, append data 
             if(r.pos >= data.size())
@@ -362,6 +392,9 @@ namespace flyfish
             auto br = index.find_pos(b);
 
             ar.pos = std::max<offset_type>(0, ar.pos);
+            ar.pos = std::min<offset_type>(data.size() - 1, ar.pos);
+
+            br.pos = std::max<offset_type>(0, br.pos);
             br.pos = std::min<offset_type>(data.size() - 1, br.pos);
 
             const auto& ad = data[ar.pos]; 
@@ -370,26 +403,26 @@ namespace flyfish
         }
     };
 
-    time_db from_directory(const std::string& path) 
+    timeline from_directory(const std::string& path) 
     {
         if(!bf::is_directory(path))
-           throw std::runtime_error("path " + path + " is not a directory"); 
+           throw std::runtime_error{"path " + path + " is not a directory"}; 
     
         bf::path root = path;
 
-        time_db db;
-        db.key = root.filename().string();
+        timeline t;
+        t.key = root.filename().string();
 
         bf::path idx_meta = root / "im";
         bf::path idx_data = root / "id";
-        db.index = index_type{idx_meta, idx_data};
+        t.index = index_type{idx_meta, idx_data};
         
         bf::path cmeta = root / "m";
         bf::path cdata = root / "d";
 
-        db.data = data_type{cmeta, cdata, DATA_SIZE};
+        t.data = data_type{cmeta, cdata, DATA_SIZE};
         
-        return db;
+        return t;
     }
 }
 
@@ -400,7 +433,8 @@ try
 
     int tm = 0;
 
-    const int TOTAL = 1000000;
+    const int TOTAL = 100000000;
+    //const int TOTAL = 10000000;
     const int TIME_INC = 10;
     const int CHANGE = 2;
 
@@ -409,7 +443,7 @@ try
         for(int a = 0; a < TOTAL; a++)
         {
             tm += TIME_INC;
-            db.append(tm, 1);
+            db.put(tm, 1);
         }
     }
     else
@@ -417,24 +451,13 @@ try
         tm = TOTAL * TIME_INC;
     }
 
-    auto d = db.diff(0, tm);
-    auto h = db.get(tm/2);
-    auto q = db.get(tm/4);
-    auto d2 = db.diff(tm/2, tm/4);
-
-
-    std::cout << "half val: " << h.value << std::endl;
-    std::cout << "half total: " << h.total << std::endl;
-    std::cout << "half integral: " << h.integral << std::endl;
+    auto d = db.diff(tm/2, tm/4);
 
     std::cout << "diff avg: " << d.value << std::endl;
     std::cout << "diff total: " << d.total << std::endl;
     std::cout << "diff integral: " << d.integral << std::endl;
 
-    std::cout << "diff2 avg: " << d2.value << std::endl;
-    std::cout << "diff2 total: " << d2.total << std::endl;
-    std::cout << "diff2 integral: " << d2.integral << std::endl;
-
+    std::cout << "total puts: " << TOTAL << std::endl;
     std::cout << "ranges: " << db.index.size() << std::endl;
     std::cout << "buckets: " << db.data.size() << std::endl;
 
