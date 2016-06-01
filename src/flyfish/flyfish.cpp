@@ -1,19 +1,16 @@
 #include <iostream>
 
 #include "util/dbc.hpp"
+#include "util/mapped_vector.hpp"
 
 #include <deque>
 #include <string>
-#include <boost/iostreams/device/mapped_file.hpp>
-#include <boost/filesystem.hpp>
 #include <exception>
 #include <algorithm>
 #include <fstream>
 #include <chrono>
 #include <cmath>
 
-namespace bio = boost::iostreams;
-namespace bf =  boost::filesystem;
 
 namespace flyfish
 {
@@ -22,207 +19,11 @@ namespace flyfish
     using change_type = std::int64_t;
     using offset_type = std::uint64_t;
 
-    void open(bio::mapped_file& file, bf::path path, std::size_t new_size)
-    {
-        REQUIRE_GREATER(new_size, 0);
-
-        if(bf::exists(path)) 
-        {
-            file.open(path);
-        }
-        else 
-        {
-            bio::mapped_file_params p;
-            p.path = path.string();
-            p.new_file_size = new_size;
-            p.flags = bio::mapped_file::readwrite;
-
-            file.open(p);
-        }
-
-        if(!file.is_open())
-            throw std::runtime_error{"unable to mmap " + path.string()};
-    }
-
-    template<class T>
-        T* open_as(bio::mapped_file& file, bf::path path, std::size_t new_size = sizeof(T))
-        {
-            REQUIRE_GREATER_EQUAL(new_size, sizeof(T));
-
-            const auto size = std::max(new_size, sizeof(T));
-
-            open(file, path, size);
-
-            ENSURE_GREATER_EQUAL(file.size(), sizeof(T));
-            return reinterpret_cast<T*>(file.data());
-        }
-
-    const std::size_t PAGE_SIZE = bio::mapped_file::alignment();
-    const std::size_t DEFAULT_NEW_SIZE = PAGE_SIZE;
-
-    template<class meta_t, class data_type>
-    class mapped_vector
-    {
-        public:
-            mapped_vector(){};
-            mapped_vector(
-                    const bf::path& meta_file, 
-                    const bf::path& data_file, 
-                    const std::size_t new_size = DEFAULT_NEW_SIZE) 
-            {
-                _data_file_path = data_file;
-                _new_size = new_size;
-
-                //open index metadata
-                _metadata = open_as<meta_t>(_meta_file, meta_file);
-
-                //open index data. New file size is new_size
-                open(_data_file, data_file, new_size);
-                _items = reinterpret_cast<data_type*>(_data_file.data());
-
-                //compute max elements
-                _max_items = _data_file.size() / sizeof(data_type);
-                CHECK_LESS_EQUAL(_metadata->size, _max_items);
-
-                ENSURE(_metadata != nullptr);
-                ENSURE(_items != nullptr);
-            }
-
-            meta_t& meta() 
-            {
-                REQUIRE(_metadata);
-                return *_metadata;
-            }
-
-            const meta_t& meta() const
-            {
-                REQUIRE(_metadata);
-                return *_metadata;
-            }
-
-            std::uint64_t size() const 
-            {
-                REQUIRE(_metadata)
-                ENSURE_LESS_EQUAL(_metadata->size, _max_items);
-                return _metadata->size;
-            }
-
-            const data_type& operator[](size_t pos) const 
-            {
-                REQUIRE(_metadata); 
-                REQUIRE(_items); 
-                REQUIRE_LESS(pos, _metadata->size);
-
-                return _items[pos];
-            }
-
-            data_type& operator[](size_t pos)
-            {
-                REQUIRE(_metadata); 
-                REQUIRE(_items); 
-                REQUIRE_LESS(pos, _metadata->size);
-
-                return _items[pos];
-            }
-
-            void push_back(const data_type& v) 
-            {
-                REQUIRE(_metadata);
-                const auto next_pos = _metadata->size;
-
-                if(next_pos >= _max_items)
-                    resize(_data_file.size() + _new_size);
-
-                _items[next_pos] = v;
-                _metadata->size++;
-            }
-
-            data_type* begin() 
-            { 
-                REQUIRE(_items);
-                return _items;
-            }
-
-            data_type* end() 
-            { 
-                REQUIRE(_items);
-                REQUIRE(_metadata);
-                return _items + size();
-            }
-
-            data_type* begin() const
-            { 
-                REQUIRE(_items);
-                return _items;
-            }
-
-            data_type* end() const
-            { 
-                REQUIRE(_items);
-                REQUIRE(_metadata);
-                return _items + size();
-            }
-
-            const data_type* cbegin() { return begin(); }
-            const data_type* cend() { return end(); }
-            const data_type* cbegin() const { return begin(); }
-            const data_type* cend() const { return end(); }
-
-            data_type& front()
-            {
-                REQUIRE(_items);
-                return *_items;
-            }
-
-            const data_type& front() const
-            {
-                REQUIRE(_items);
-                return *_items;
-            }
-
-            data_type& back()
-            {
-                REQUIRE(_items);
-                REQUIRE(_metadata);
-                REQUIRE_GREATER(_metadata->size, 0);
-                return *(_items + (_metadata->size - 1));
-            }
-
-            const data_type& back() const
-            {
-                REQUIRE(_items);
-                REQUIRE(_metadata);
-                REQUIRE_GREATER(_metadata->size, 0);
-                return *(_items + (_metadata->size - 1));
-            }
-
-        private:
-
-            void resize(size_t new_size) 
-            {
-                _data_file.resize(new_size);
-                _items = reinterpret_cast<data_type*>(_data_file.data());
-                _max_items = _data_file.size() / sizeof(data_type);
-            }
-
-
-        protected:
-            meta_t* _metadata = nullptr;
-            data_type* _items = nullptr;
-            std::size_t _max_items = 0;
-            std::size_t _new_size = 0;
-            bio::mapped_file _meta_file;
-            bio::mapped_file _data_file;
-            bf::path _data_file_path;
-    };
-
-
     struct index_item
     {
         time_type time = 0;
         offset_type pos = 0;
     };
-
 
     struct index_metadata
     {
@@ -243,9 +44,9 @@ namespace flyfish
         count_type second_integral;
     };
 
-    const std::size_t DATA_SIZE = PAGE_SIZE;
+    const std::size_t DATA_SIZE = util::PAGE_SIZE;
     const std::uint64_t DEFAULT_RESOLUTION = 100;
-    const std::size_t INDEX_SIZE = PAGE_SIZE;
+    const std::size_t INDEX_SIZE = util::PAGE_SIZE;
     const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
     struct pos_result
@@ -255,12 +56,12 @@ namespace flyfish
         offset_type pos;
     };
 
-    class index_type : public mapped_vector<index_metadata, index_item>
+    class index_type : public util::mapped_vector<index_metadata, index_item>
     {
         public:
-            index_type() : mapped_vector{} {};
+            index_type() : util::mapped_vector<index_metadata, index_item>{} {};
             index_type(const bf::path& meta_file, const bf::path& data_file) :
-                mapped_vector{meta_file, data_file, INDEX_SIZE}
+                util::mapped_vector<index_metadata, index_item>{meta_file, data_file, INDEX_SIZE}
             {
                 REQUIRE(_metadata);
 
@@ -300,7 +101,7 @@ namespace flyfish
     using key_t = std::string;
 
 
-    using data_type = mapped_vector<data_metadata, data_item>;
+    using data_type = util::mapped_vector<data_metadata, data_item>;
 
     void propogate(data_item prev, data_item& current)
     {
@@ -335,6 +136,7 @@ namespace flyfish
         const auto second_mean = n > 0 ? second_sum / n : (a.value * a.value);
         const auto variance = second_mean - mean_squared;
         const change_type change = b.value > a.value ? (b.value - a.value) : -(a.value - b.value);
+
         return diff_result 
         { 
             sum, 
