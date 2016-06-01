@@ -43,3 +43,15 @@ is that an entry is inserted into the first bucket in the range. The overall ins
 operation is constant time since the bucket size is fixed no matter the size of
 the data.
 
+Building
+==========================
+
+Download [boost](boost.org) and install it. Go to flyfish project directory and
+run...
+
+    mkdir build
+    cmake ..
+    make -j
+    ./src/flyfish/flyfish
+
+
