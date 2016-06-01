@@ -269,12 +269,20 @@ try
 
     size_t tm = 0;
 
+    //uncomment for a billion data points inserted.
+    //Requires 2.5GB of space
     //const size_t TOTAL = 1000000000;
+    //
+
+    //100 million
+    //Requires around 200MB of hardrive space.
     const int TOTAL = 100000000;
     const size_t TIME_INC = 10;
     const int CHANGE = 2;
 
     std::cout << std::fixed;
+    //insert data if the data is empty
+    //otherwise skip
     if(db.data.size() == 0)
     {
         auto start = std::chrono::high_resolution_clock::now();
@@ -297,6 +305,7 @@ try
 
     auto start = std::chrono::high_resolution_clock::now();
 
+    //Compute diff between two time ranges.
     auto d = db.diff(tm/2, tm/4);
 
     auto end = std::chrono::high_resolution_clock::now();
