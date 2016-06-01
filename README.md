@@ -11,8 +11,8 @@ actual values.
 Design
 =========================
 
-Store a timestamp range index and data in files The index and data together make a 
-timeline. Timestamp ranges are broken up as fixed frames with buckets at a given 
+There is an index and time data for each "key". The key, index and data together make a 
+timeline. Time ranges are broken up as fixed frames with buckets at a given 
 time resolution. Each bucket contains the value of counts in that bucket, 
 a sum up to that bucket, and a sum of squared values up to that bucket. 
 This is a 1D version of a summed area table with a second integral.
