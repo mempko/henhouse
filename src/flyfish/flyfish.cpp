@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <fstream>
 #include <chrono>
+#include <cmath>
 
 namespace bio = boost::iostreams;
 namespace bf =  boost::filesystem;
@@ -222,14 +223,30 @@ namespace flyfish
         offset_type pos = 0;
     };
 
+
     struct index_metadata
     {
         std::uint64_t size = 0 ;
         std::uint64_t resolution = 0;
+        std::uint64_t frame_size = 0;
     };
 
+    struct data_metadata
+    {
+        std::uint64_t size = 0;
+    };
+
+    struct data_item
+    {
+        count_type value;
+        count_type integral;
+        count_type second_integral;
+    };
+
+    const std::size_t DATA_SIZE = PAGE_SIZE;
     const std::uint64_t DEFAULT_RESOLUTION = 100;
     const std::size_t INDEX_SIZE = PAGE_SIZE;
+    const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
     struct pos_result
     {
@@ -248,6 +265,7 @@ namespace flyfish
                 REQUIRE(_metadata);
 
                 if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
+                if(_metadata->frame_size == 0) _metadata->frame_size = FRAME_SIZE;
             }
 
             index_item find_range(time_type t) const 
@@ -281,27 +299,13 @@ namespace flyfish
 
     using key_t = std::string;
 
-    struct data_metadata
-    {
-        std::uint64_t size = 0;
-    };
-
-    struct data_item
-    {
-        count_type value;
-        count_type total;
-        change_type integral;
-    };
-
-    const std::size_t DATA_SIZE = 4096000;
 
     using data_type = mapped_vector<data_metadata, data_item>;
 
     void propogate(data_item prev, data_item& current)
     {
-        current.total = prev.total + current.value;
-        const auto change = current.value - prev.value;
-        current.integral = prev.integral + change;
+        current.integral = prev.integral + current.value;
+        current.second_integral = prev.second_integral + (current.value * current.value);
     }
 
     void update_current(data_item prev, data_item& current, count_type c)
@@ -310,17 +314,35 @@ namespace flyfish
         propogate(prev, current);
     }
 
-    data_item diff_buckets(data_item a, data_item b, std::size_t n)
+    struct diff_result
     {
-        const auto total = b.total - a.total;
-        const auto avg = n > 0 ? total / n : a.value;
-        return data_item { 
-            avg, 
-            b.total - a.total, 
-            b.integral - a.integral};
-    }
+        count_type sum;
+        count_type mean;
+        count_type variance;
+        change_type change;
+        count_type size;
+    };
 
-    const std::size_t FRAME_SIZE = PAGE_SIZE / sizeof(data_item);
+    diff_result diff_buckets(data_item a, data_item b, std::size_t n)
+    {
+        REQUIRE_GREATER_EQUAL(b.integral, a.integral);
+        REQUIRE_GREATER_EQUAL(b.second_integral, a.second_integral);
+        const auto sum = b.integral - a.integral;
+        const auto second_sum = b.second_integral - a.second_integral;
+        const auto mean = n > 0 ? sum / n : a.value;
+        const auto mean_squared = mean * mean;
+        const auto second_mean = n > 0 ? second_sum / n : (a.value * a.value);
+        const auto variance = second_mean - mean_squared;
+        const change_type change = b.value > a.value ? (b.value - a.value) : -(a.value - b.value);
+        return diff_result 
+        { 
+            sum, 
+            mean, 
+            variance,
+            change,
+            n
+        };
+    }
 
     struct timeline
     {
@@ -341,30 +363,30 @@ namespace flyfish
                     //a specific performance profile. This is a deliberate limitation.
                     auto r = index.find_pos(t, last_range);
 
+                    //bucket is current or in the past, no need to index.
+                    if(r.pos < data.size())
+                    {
+                        const auto prev = r.pos > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
+                        update_current(prev, data[r.pos], c);
+                        for(auto p = r.pos + 1; p < data.size(); p++)
+                            propogate(data[p-1], data[p]);
+                    }
                     //if we move beyond end, append data 
-                    if(r.pos >= data.size())
+                    else
                     {
                         r.pos = data.size();
                         const auto prev = data[r.pos - 1];
-                        data_item current = { c, 0, 0 };
+                        data_item current = { c, 0};
                         propogate(prev, current);
                         data.push_back(current);
 
-                        if(r.offset < FRAME_SIZE) return true;
+                        if(r.offset < index.meta().frame_size) return true;
 
                         //index only if the offset is same or bigger than the frame size.
                         const auto resolution = index.meta().resolution;
                         const auto aliased_time = r.range.time + (r.offset * resolution);
                         index_item index_entry = {aliased_time, r.pos};
                         index.push_back(index_entry);
-                    }
-                    //otherwise bucket is current or in the past, no need to index.
-                    else
-                    {
-                        const auto prev = r.pos > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
-                        update_current(prev, data[r.pos], c);
-                        for(auto p = r.pos + 1; p < data.size(); p++)
-                            propogate(data[p-1], data[p]);
                     }
                 }
                 else return false;
@@ -373,7 +395,7 @@ namespace flyfish
             {
                 CHECK_EQUAL(data.size(), 0);
 
-                data_item v{ c, 0, 0 };
+                data_item v{ c, 0};
                 data.push_back(v);
 
                 index_item i = {t, 0};
@@ -390,10 +412,10 @@ namespace flyfish
             return data[r.pos];
         }
 
-        data_item diff(time_type a, time_type b) 
+        diff_result diff(time_type a, time_type b) 
         {
             if(a > b) std::swap(a,b);
-            if(data.size() == 0) return data_item{ 0, 0, 0};
+            if(data.size() == 0) return diff_result{ 0, 0, 0};
 
             auto ar = index.find_pos(a);
             auto br = index.find_pos(b);
@@ -406,7 +428,11 @@ namespace flyfish
 
             const auto& ad = data[ar.pos]; 
             const auto& bd = data[br.pos]; 
-            return diff_buckets(ad, bd, br.pos - ar.pos);
+
+            CHECK_GREATER_EQUAL(b, a);
+            const auto n = (b - a) / index.meta().resolution;
+
+            return diff_buckets(ad, bd, n);
         }
     };
 
@@ -440,8 +466,8 @@ try
 
     size_t tm = 0;
 
-    const size_t TOTAL = 1000000000;
-    //const int TOTAL = 10000000;
+    //const size_t TOTAL = 1000000000;
+    const int TOTAL = 100000000;
     const size_t TIME_INC = 10;
     const int CHANGE = 2;
 
@@ -452,7 +478,8 @@ try
         for(int a = 0; a < TOTAL; a++)
         {
             tm += TIME_INC;
-            db.put(tm, 1);
+            auto v = a % 3 ? 1 : 2;
+            db.put(tm, v);
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
@@ -475,9 +502,11 @@ try
 
     std::cout << "query time: " << sec << "s" << std::endl;
 
-    std::cout << "diff avg: " << d.value << std::endl;
-    std::cout << "diff total: " << d.total << std::endl;
-    std::cout << "diff integral: " << d.integral << std::endl;
+    std::cout << "diff sum: " << d.sum << std::endl;
+    std::cout << "diff avg: " << d.mean << std::endl;
+    std::cout << "diff variance: " << d.variance << std::endl;
+    std::cout << "diff change: " << d.change << std::endl;
+    std::cout << "diff size: " << d.size << std::endl;
 
     std::cout << "total puts: " << TOTAL << std::endl;
     std::cout << "ranges: " << db.index.size() << std::endl;
