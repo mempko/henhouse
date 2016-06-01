@@ -2,7 +2,7 @@ FlyFish
 ========================
 
 FlyFish is a proof of concept for creating a fast time series DB that can compute
-sum, average, and variance between any two time ranges in constant time. 
+sum, average, and variance between any two time ranges in basically constant time. 
 
 Limitation with the design is that pushing data to the DB must happen in the last
 timestamp range because the DB stores a sums and squared sums table along with
@@ -27,7 +27,7 @@ This prototype can put up to 18 million data points per second into the DB.
 Complexity Analysis
 ==========================
 
-Finding a time ranges is O(log(n)) inside the index because binary search is used
+Finding a time range inside the index is O(log(n)) because binary search is used
 for finding the index entry. 
 
 Once two time ranges are found, then finding bucket within range is constant time
