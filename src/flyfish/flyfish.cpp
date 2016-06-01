@@ -327,6 +327,7 @@ namespace flyfish
     {
         REQUIRE_GREATER_EQUAL(b.integral, a.integral);
         REQUIRE_GREATER_EQUAL(b.second_integral, a.second_integral);
+
         const auto sum = b.integral - a.integral;
         const auto second_sum = b.second_integral - a.second_integral;
         const auto mean = n > 0 ? sum / n : a.value;
