@@ -13,6 +13,7 @@ add_executable(
 
 target_link_libraries(
     flyfish
+    flyfish_service
     flyfish_db
     flyfish_util
     ${Boost_LIBRARIES}
@@ -20,6 +21,7 @@ target_link_libraries(
 
 add_dependencies(
     flyfish 
+    flyfish_service
     flyfish_db
     flyfish_util)
 
