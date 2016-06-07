@@ -13,12 +13,14 @@ add_executable(
 
 target_link_libraries(
     flyfish
+    flyfish_db
     flyfish_util
     ${Boost_LIBRARIES}
     ${MISC_LIBRARIES})
 
 add_dependencies(
     flyfish 
+    flyfish_db
     flyfish_util)
 
 install(TARGETS flyfish DESTINATION bin)
