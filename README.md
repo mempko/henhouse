@@ -48,7 +48,14 @@ the data.
 Building
 ==========================
 
-Download [boost](boost.org) and install it. Go to flyfish project directory and
+Download Dependencies.
+
+    - [boost](boost.org) 
+    - [wangle](https://github.com/facebook/wangle)
+    - [folly](https://github.com/facebook/folly)
+    - [proxygen](https://github.com/facebook/proxygen)
+
+Go to flyfish project directory and
 run...
 
     mkdir build
