@@ -1,73 +1,71 @@
-#include "service/mpi.hpp"
+#include "service/put.hpp"
+#include "service/query.hpp"
 
 #include <iostream>
 #include <chrono>
+#include <sstream>
+#include <vector>
+#include <limits>
+#include <unistd.h>
+
+const std::size_t WORKERS = 8;
+const std::size_t MAX_VALUES = 10000;
+
+using folly::EventBase;
+using folly::EventBaseManager;
+using folly::SocketAddress;
+
+using Protocol = proxygen::HTTPServer::Protocol;
 
 int main(int argc, char** argv)
 try
 {
-    bm::environment env;
-    bm::communicator world;
+    const std::size_t WORKERS = sysconf(_SC_NPROCESSORS_ONLN);
+    const std::string ip = "0.0.0.0";
+    const std::uint16_t http_port = 7070;
+    const std::uint16_t http2_port = 7071;
 
-    if(world.rank() == 0) 
+    flyfish::threaded::server db{WORKERS, "./tmp"};
+
+    //setup put endpoing that mimics graphite
+    wangle::ServerBootstrap<flyfish::net::put_pipeline> put_server;
+    put_server.childPipeline(std::make_shared<flyfish::net::put_pipeline_factory>(db));
+    put_server.bind(2003); //graphite receive port
+
+
+    //setup http query interface
+    std::vector<proxygen::HTTPServer::IPConfig> IPs = {
+        {SocketAddress(ip, http_port), Protocol::HTTP},
+        {SocketAddress(ip, http2_port), Protocol::HTTP2},
+    };
+
+    proxygen::HTTPServerOptions options;
+    options.threads = WORKERS;
+    options.idleTimeout = std::chrono::milliseconds(60000);
+    options.shutdownOn = {SIGINT, SIGTERM};
+    options.enableContentCompression = true;
+    options.handlerFactories = proxygen::RequestHandlerChain()
+        .addThen<flyfish::net::query_handler_factory>(db, MAX_VALUES)
+        .build();
+
+    proxygen::HTTPServer query_server(std::move(options));
+    query_server.bind(IPs);
+
+
+    //start services
+    std::thread put_thread
     {
-        flyfish::mpi::server db{world};
+        [&]() { put_server.waitForStop(); }
+    };
 
-        size_t tm = 0;
-
-        //uncomment for a billion data points inserted.
-        //Requires 2.5GB of space
-        //const size_t TOTAL = 1000000000;
-        //
-
-        //100 million
-        //Requires around 200MB of hardrive space.
-        const int TOTAL = 1000000;
-        const size_t TIME_INC = 10;
-        const int CHANGE = 2;
-
-        std::cout << std::fixed;
-
-        std::string keys[] = {"k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8"};
-
-        //insert data if the data is empty
-        //otherwise skip
-        auto start = std::chrono::high_resolution_clock::now();
-        for(int a = 0; a < TOTAL; a++)
-        {
-            tm += TIME_INC;
-            auto v = a % 3 ? 1 : 2;
-            db.put(keys[a%8], tm, v);
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
-        auto sec = duration / 1000000000.0;
-        std::cout <<  sec << " seconds" << std::endl;
-        std::cout << (TOTAL / sec) << " puts per second" << std::endl;
-        std::cout << std::endl;
-
-        for(auto k : keys)
-        {
-            std::cout << k << std::endl;
-            auto start = std::chrono::high_resolution_clock::now();
-            auto d = db.diff(k, tm/4, tm/2);
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
-            auto sec = duration / 1000000000.0;
-
-            std::cout << "\treq time: " << sec << "(s)" << std::endl;
-            std::cout << "\tsum: " << d.sum << std::endl;
-            std::cout << "\tavg: " << d.mean << std::endl;
-            std::cout << "\tvariance: " << d.variance << std::endl;
-            std::cout << "\tchange: " << d.change << std::endl;
-            std::cout << "\tsize: " << d.size << std::endl;
-        }
-    }
-    else
+    std::thread query_thread
     {
-        flyfish::mpi::worker worker{world, 0, "./tmp"};
-        worker();
-    }
+        [&] () { query_server.start(); }
+    };
+
+    //wait forever
+    put_thread.join();
+    query_thread.join();
 
     return 0;
 }

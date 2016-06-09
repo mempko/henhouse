@@ -21,6 +21,27 @@ namespace flyfish
             propogate(prev, current);
         }
 
+        diff_result smooth_diff_bucket(time_type time_diff, data_item a, std::uint64_t resolution)
+        {
+            REQUIRE_GREATER(time_diff, 0);
+            REQUIRE_GREATER_EQUAL(resolution, time_diff);
+
+            const auto sub_size = resolution / time_diff;
+            const auto sum = a.value / sub_size;
+            const auto mean = sum;
+            const auto variance = 0;
+            const change_type change = 0;
+
+            return diff_result 
+            { 
+                sum, 
+                    mean, 
+                    variance,
+                    change,
+                    0
+            };
+        }
+
         diff_result diff_buckets(data_item a, data_item b, std::size_t n)
         {
             REQUIRE_GREATER_EQUAL(b.integral, a.integral);
@@ -55,7 +76,7 @@ namespace flyfish
                 {
                     //get last position only because we want to keep 
                     //a specific performance profile. This is a deliberate limitation.
-                    auto r = index.find_pos(t, last_range);
+                    auto r = index.find_pos_from_range(t, last_range);
 
                     //bucket is current or in the past, no need to index.
                     if(r.pos < data.size())
@@ -106,6 +127,14 @@ namespace flyfish
             return data[r.pos];
         }
 
+        template <class T>
+            T within(T v, T a, T b)
+            {
+                v = std::max(a, v);
+                v = std::min(v, b);
+                return v;
+            }
+
         diff_result timeline::diff(time_type a, time_type b) const
         {
             if(a > b) std::swap(a,b);
@@ -114,19 +143,23 @@ namespace flyfish
             auto ar = index.find_pos(a);
             auto br = index.find_pos(b);
 
-            ar.pos = std::max<offset_type>(0, ar.pos);
-            ar.pos = std::min<offset_type>(data.size() - 1, ar.pos);
+            b = std::max(b, br.range.time);
+            a = within(a, ar.range.time, b);
 
-            br.pos = std::max<offset_type>(0, br.pos);
-            br.pos = std::min<offset_type>(data.size() - 1, br.pos);
+            if(a == b) return diff_result{ 0, 0, 0};
+
+            ar.pos = within<offset_type>(ar.pos, 0, data.size() - 1);
+            br.pos = within<offset_type>(br.pos, 0, data.size() - 1);
 
             const auto& ad = data[ar.pos]; 
             const auto& bd = data[br.pos]; 
 
             CHECK_GREATER_EQUAL(b, a);
-            const auto n = (b - a) / index.meta().resolution;
+            const auto resolution = index.meta().resolution;
+            const auto time_diff = b - a;
+            const auto n = time_diff / resolution;
 
-            return diff_buckets(ad, bd, n);
+            return n > 0 ? diff_buckets(ad, bd, n) : smooth_diff_bucket(time_diff, ad, resolution);
         }
 
         timeline from_directory(const std::string& path) 

@@ -43,7 +43,7 @@ namespace flyfish
         };
 
         const std::size_t DATA_SIZE = util::PAGE_SIZE;
-        const std::uint64_t DEFAULT_RESOLUTION = 100;
+        const std::uint64_t DEFAULT_RESOLUTION = 5; //seconds
         const std::size_t INDEX_SIZE = util::PAGE_SIZE;
         const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
@@ -75,10 +75,11 @@ namespace flyfish
                     auto r = std::upper_bound(cbegin(), cend(), t, 
                             [](time_type l, const auto& r) { return l < r.time;});
 
+                    if(r == cend()) return back();
                     return r != cbegin() ? *(r - 1) : front();
                 }
 
-                pos_result find_pos(time_type t, const index_item range) const
+                pos_result find_pos_from_range(time_type t, const index_item range) const
                 {
                     REQUIRE(_metadata);
 
@@ -88,11 +89,25 @@ namespace flyfish
                     return pos_result{ range, offset, range.pos + offset};
                 }
 
+                pos_result find_pos_within_range(time_type t, const index_item range) const
+                {
+                    REQUIRE(_metadata);
+
+                    t = std::max(t, range.time);
+
+                    const auto offset_time = t - range.time;
+                    const auto offset = std::min(
+                            offset_time / _metadata->resolution, 
+                            _metadata->frame_size-1);
+
+                    return pos_result{ range, offset, range.pos + offset};
+                }
+
                 pos_result find_pos(time_type t) const
                 {
                     if(size() == 0) return pos_result {index_item { t, 0}, 0, 0};
                     const auto range = find_range(t);
-                    return find_pos(t, range);
+                    return find_pos_within_range(t, range);
                 }
         };
 

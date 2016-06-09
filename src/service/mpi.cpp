@@ -30,8 +30,8 @@ namespace flyfish
         {
             put_req req;
             _world.recv(_requester, PUT_REQ, req);
-            //std::cout << "(" << _world.rank() << ")" << "put: " << r.key << " " << r.time << " " << r.count << std::endl;
             _db.put(req.key, req.time, req.count);
+            std::cout << "(" << _world.rank() << ")" << "put: " << req.key << " " << req.time << " " << req.count << " size: " << _db.key_data_size(req.key) << std::endl;
         }
 
         void worker::diff()
