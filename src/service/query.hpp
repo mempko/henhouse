@@ -22,6 +22,10 @@ namespace flyfish
 {
     namespace net
     {
+        const std::string SMALL_PRECISION_ERROR  = 
+            "cannot go beyond second precision, increase time or reduce amount"
+            "of requested values";
+
         class query_request_handler : public proxygen::RequestHandler {
             public:
                 explicit query_request_handler(threaded::server& db, const std::size_t max_values) : 
@@ -168,6 +172,8 @@ namespace flyfish
                     if(a > b) std::swap(a, b);
 
                     auto step = (b - a) / c;
+                    if(step == 0) throw std::runtime_error{SMALL_PRECISION_ERROR};
+                    
 
                     folly::dynamic arr = folly::dynamic::array();
 
@@ -190,6 +196,7 @@ namespace flyfish
                     if(a > b) std::swap(a, b);
 
                     auto step = (b - a) / c;
+                    if(step == 0) throw std::runtime_error{SMALL_PRECISION_ERROR};
 
                     std::stringstream s;
                     auto e = a + step;

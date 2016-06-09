@@ -98,7 +98,7 @@ namespace flyfish
                     const auto offset_time = t - range.time;
                     const auto offset = std::min(
                             offset_time / _metadata->resolution, 
-                            _metadata->frame_size-1);
+                            _metadata->frame_size - 1);
 
                     return pos_result{ range, offset, range.pos + offset};
                 }

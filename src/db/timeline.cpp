@@ -101,6 +101,8 @@ namespace flyfish
                         const auto resolution = index.meta().resolution;
                         const auto aliased_time = r.range.time + (r.offset * resolution);
                         index_item index_entry = {aliased_time, r.pos};
+
+                        CHECK_EQUAL(index_entry.pos - r.pos, index.meta().frame_size);
                         index.push_back(index_entry);
                     }
                 }
@@ -110,7 +112,7 @@ namespace flyfish
             {
                 CHECK_EQUAL(data.size(), 0);
 
-                data_item v{ c, 0};
+                data_item v{ c, 0, 0};
                 data.push_back(v);
 
                 index_item i = {t, 0};
@@ -155,6 +157,8 @@ namespace flyfish
             const auto& bd = data[br.pos]; 
 
             CHECK_GREATER_EQUAL(b, a);
+            CHECK_GREATER_EQUAL(br.pos, ar.pos);
+
             const auto resolution = index.meta().resolution;
             const auto time_diff = b - a;
             const auto n = time_diff / resolution;
