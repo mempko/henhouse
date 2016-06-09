@@ -8,6 +8,8 @@ Limitation with the design is that pushing data to the DB must happen in the las
 timestamp range because the DB stores a sums and sum of squares table along with
 actual values.
 
+![alt text](doc/graph.png "Time Graph")
+
 Design
 =========================
 
