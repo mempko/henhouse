@@ -18,7 +18,7 @@ namespace flyfish
 
             public:
 
-                const data_item& get(const std::string& key, time_type t) const;
+                get_result get(const std::string& key, time_type t) const;
                 bool put(const std::string& key, time_type t, count_type c);
                 diff_result diff(const std::string& key, time_type a, time_type b) const;
                 std::size_t key_index_size(const std::string& key) const;

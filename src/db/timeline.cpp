@@ -58,10 +58,10 @@ namespace flyfish
             return diff_result 
             { 
                 sum, 
-                    mean, 
-                    variance,
-                    change,
-                    n
+                mean, 
+                variance,
+                change,
+                n
             };
         }
 
@@ -69,40 +69,43 @@ namespace flyfish
         {
             if(index.size() > 0)
             {
-                const auto& last_range = index.back();
+                const auto last_range = index.cend() - 1;
 
                 //don't add if time is before last range
-                if(t >= last_range.time) 
+                if(t >= last_range->time) 
                 {
                     //get last position only because we want to keep 
                     //a specific performance profile. This is a deliberate limitation.
-                    auto r = index.find_pos_from_range(t, last_range);
+                    auto p = index.find_pos_from_range(t, last_range, index.cend());
+                    const auto pos = p.pos + p.offset;
 
                     //bucket is current or in the past, no need to index.
-                    if(r.pos < data.size())
+                    if(pos < data.size())
                     {
-                        const auto prev = r.pos > 0 ? data[r.pos - 1] : data_item {0, 0, 0};
-                        update_current(prev, data[r.pos], c);
-                        for(auto p = r.pos + 1; p < data.size(); p++)
+                        const auto prev = pos > 0 ? data[pos - 1] : data_item {0, 0, 0};
+                        update_current(prev, data[pos], c);
+                        for(auto p = pos + 1; p < data.size(); p++)
                             propogate(data[p-1], data[p]);
                     }
                     //if we move beyond end, append data 
                     else
                     {
-                        r.pos = data.size();
-                        const auto prev = data[r.pos - 1];
+                        const auto last_pos = data.size() - 1;
+                        const auto prev = data[last_pos];
                         data_item current = { c, 0};
                         propogate(prev, current);
                         data.push_back(current);
 
-                        if(r.offset < index.meta().frame_size) return true;
+                        //skip if we have no gaps, otherwise index.
+                        auto new_pos = last_pos + 1;
+                        if(pos == new_pos) return true;
 
                         //index only if the offset is same or bigger than the frame size.
                         const auto resolution = index.meta().resolution;
-                        const auto aliased_time = r.range.time + (r.offset * resolution);
-                        index_item index_entry = {aliased_time, r.pos};
+                        const auto aliased_time = p.time + (p.offset * resolution);
+                        index_item index_entry = {aliased_time, new_pos};
 
-                        CHECK_EQUAL(index_entry.pos - r.pos, index.meta().frame_size);
+                        CHECK_LESS_EQUAL(aliased_time, t);
                         index.push_back(index_entry);
                     }
                 }
@@ -122,11 +125,26 @@ namespace flyfish
             return true;
         }
 
-        const data_item& timeline::get(time_t t) const  
+        void clamp(pos_result& r, std::size_t size)
         {
-            const auto r = index.find_pos(t);
-            REQUIRE_RANGE(r.pos, 0, data.size());
-            return data[r.pos];
+            REQUIRE_LESS(r.pos, size);
+
+            const auto pos = r.pos + r.offset;
+            if(pos < size) return;
+            r.offset = size - r.pos - 1;
+        }
+
+        get_result timeline::get(time_t t) const  
+        {
+            auto p = index.find_pos(t);
+            clamp(p, data.size());
+            return get_result 
+            { 
+                p.time, 
+                p.pos,
+                p.offset,
+                data[p.pos + p.offset] 
+            };
         }
 
         template <class T>
@@ -142,19 +160,13 @@ namespace flyfish
             if(a > b) std::swap(a,b);
             if(data.size() == 0) return diff_result{ 0, 0, 0};
 
-            auto ar = index.find_pos(a);
-            auto br = index.find_pos(b);
+            auto ar = get(a);
+            auto br = get(b);
 
-            b = std::max(b, br.range.time);
-            a = within(a, ar.range.time, b);
+            b = std::max(b, br.time);
+            a = within(a, ar.time, b);
 
-            if(a == b) return diff_result{ 0, 0, 0};
-
-            ar.pos = within<offset_type>(ar.pos, 0, data.size() - 1);
-            br.pos = within<offset_type>(br.pos, 0, data.size() - 1);
-
-            const auto& ad = data[ar.pos]; 
-            const auto& bd = data[br.pos]; 
+            if(a == b) return diff_result{ 0, 0, 0 };
 
             CHECK_GREATER_EQUAL(b, a);
             CHECK_GREATER_EQUAL(br.pos, ar.pos);
@@ -163,7 +175,9 @@ namespace flyfish
             const auto time_diff = b - a;
             const auto n = time_diff / resolution;
 
-            return n > 0 ? diff_buckets(ad, bd, n) : smooth_diff_bucket(time_diff, ad, resolution);
+            return n > 0 ? 
+                diff_buckets(ar.value, br.value, n) : 
+                smooth_diff_bucket(time_diff, ar.value, resolution);
         }
 
         timeline from_directory(const std::string& path) 

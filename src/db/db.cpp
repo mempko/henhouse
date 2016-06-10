@@ -13,7 +13,7 @@ namespace flyfish
             return key;
         }
 
-        const data_item& timeline_db::get(const std::string& key, time_type t) const 
+        get_result timeline_db::get(const std::string& key, time_type t) const 
         {
             const auto& tl = get_tl(key);
             return tl.get(t);

@@ -81,8 +81,8 @@ namespace flyfish
                         if(next_pos >= _max_items)
                             resize(_data_file.size() + _new_size);
 
-                        _items[next_pos] = v;
                         _metadata->size++;
+                        _items[next_pos] = v;
                     }
 
                     data_type* begin() 

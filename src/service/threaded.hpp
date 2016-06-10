@@ -49,7 +49,7 @@ namespace flyfish
             public:
                 server(std::size_t workers, const std::string& root);
 
-                const db::data_item& get(const std::string& key, db::time_type t) const; 
+                db::get_result get(const std::string& key, db::time_type t) const; 
                 bool put(const std::string& key, db::time_type t, db::count_type c);
                 db::diff_result diff(const std::string& key, db::time_type a, db::time_type b) const;
 

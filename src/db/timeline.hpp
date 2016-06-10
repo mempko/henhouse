@@ -27,7 +27,6 @@ namespace flyfish
         {
             std::uint64_t size = 0 ;
             std::uint64_t resolution = 0;
-            std::uint64_t frame_size = 0;
         };
 
         struct data_metadata
@@ -43,15 +42,15 @@ namespace flyfish
         };
 
         const std::size_t DATA_SIZE = util::PAGE_SIZE;
-        const std::uint64_t DEFAULT_RESOLUTION = 5; //seconds
+        const std::uint64_t DEFAULT_RESOLUTION = 1; //seconds
         const std::size_t INDEX_SIZE = util::PAGE_SIZE;
         const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
         struct pos_result
         {
-            index_item range;
-            offset_type offset;
+            time_type time;
             offset_type pos;
+            offset_type offset;
         };
 
         class index_type : public util::mapped_vector<index_metadata, index_item>
@@ -64,10 +63,9 @@ namespace flyfish
                     REQUIRE(_metadata);
 
                     if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
-                    if(_metadata->frame_size == 0) _metadata->frame_size = FRAME_SIZE;
                 }
 
-                index_item find_range(time_type t) const 
+                const index_item* find_range(time_type t) const 
                 {
                     REQUIRE(_metadata);
                     REQUIRE(_items);
@@ -75,45 +73,50 @@ namespace flyfish
                     auto r = std::upper_bound(cbegin(), cend(), t, 
                             [](time_type l, const auto& r) { return l < r.time;});
 
-                    if(r == cend()) return back();
-                    return r != cbegin() ? *(r - 1) : front();
+                    return r != cbegin() ? r - 1: nullptr;
                 }
 
-                pos_result find_pos_from_range(time_type t, const index_item range) const
+                pos_result find_pos_from_range(
+                        time_type t, 
+                        const index_item* range, 
+                        const index_item* next) const
                 {
                     REQUIRE(_metadata);
+                    REQUIRE(range);
+                    REQUIRE(next);
 
-                    t = std::max(t, range.time);
-                    const auto offset_time = t - range.time;
-                    const auto offset = offset_time / _metadata->resolution;
-                    return pos_result{ range, offset, range.pos + offset};
-                }
+                    t = std::max(t, range->time);
+                    const auto offset_time = t - range->time;
+                    auto offset = offset_time / _metadata->resolution;
+                    const auto pos = range->pos + offset;
 
-                pos_result find_pos_within_range(time_type t, const index_item range) const
-                {
-                    REQUIRE(_metadata);
-
-                    t = std::max(t, range.time);
-
-                    const auto offset_time = t - range.time;
-                    const auto offset = std::min(
-                            offset_time / _metadata->resolution, 
-                            _metadata->frame_size - 1);
-
-                    return pos_result{ range, offset, range.pos + offset};
+                    //if we are not in last range, then check for overlap
+                    //with next index element
+                    if(next != cend() && pos >= next->pos)
+                        offset = next->pos - range->pos - 1;
+                    return pos_result{range->time, range->pos, offset};
                 }
 
                 pos_result find_pos(time_type t) const
                 {
-                    if(size() == 0) return pos_result {index_item { t, 0}, 0, 0};
+                    if(size() == 0) return pos_result {t, 0, 0};
                     const auto range = find_range(t);
-                    return find_pos_within_range(t, range);
+                    if(range == nullptr) return pos_result{front().time, 0, 0};
+                    return find_pos_from_range(t, range, range + 1);
                 }
         };
 
         using key_t = std::string;
 
         using data_type = util::mapped_vector<data_metadata, data_item>;
+
+        struct get_result
+        {
+            time_type time;
+            offset_type pos;
+            offset_type offset;
+            data_item value;
+        };
 
         struct diff_result
         {
@@ -131,7 +134,7 @@ namespace flyfish
             data_type data;
 
             bool put(time_type t, count_type c);
-            const data_item& get(time_t t) const;  
+            get_result get(time_t t) const;  
             diff_result diff(time_type a, time_type b) const;
         };
 

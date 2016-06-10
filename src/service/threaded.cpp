@@ -41,7 +41,7 @@ namespace flyfish
 
         }
 
-        const db::data_item& server::get(const std::string& key, db::time_type t) const 
+        db::get_result server::get(const std::string& key, db::time_type t) const 
         {
             auto n = worker_num(key);
             auto& w = _workers[worker_num(key)];
