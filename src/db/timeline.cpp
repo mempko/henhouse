@@ -100,7 +100,7 @@ namespace flyfish
                         auto new_pos = last_pos + 1;
                         if(pos == new_pos) return true;
 
-                        //index only if the offset is same or bigger than the frame size.
+                        //index position
                         const auto resolution = index.meta().resolution;
                         const auto aliased_time = p.time + (p.offset * resolution);
                         index_item index_entry = {aliased_time, new_pos};
