@@ -31,10 +31,9 @@ namespace flyfish
 
                     std::string key;
                     db::time_type t; 
-                    db::count_type c;
+                    std::int64_t c;
                     m >> key >> c >> t;
-
-                    _db.put(key, t, c);
+                    if(c > 0) _db.put(key, t, c);
                     close(ctx);
                 }
 

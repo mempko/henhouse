@@ -22,9 +22,11 @@ namespace flyfish
 {
     namespace net
     {
-        const std::string SMALL_PRECISION_ERROR  = 
-            "cannot go beyond second precision, increase time or reduce amount"
-            "of requested values";
+        const std::string SMALL_PRECISION_STEP_ERROR  = 
+            "cannot go beyond second precision, for step";
+
+        const std::string SMALL_PRECISION_SIZE_ERROR  = 
+            "cannot go beyond second precision, for segment size";
 
         class query_request_handler : public proxygen::RequestHandler {
             public:
@@ -34,7 +36,7 @@ namespace flyfish
                 void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override
                 try
                 {
-                    if(headers->getPath() == "/diff") 
+                    if(headers->getPath() == "/summary") 
                         on_diff(*headers);
                     else if(headers->getPath() == "/values") 
                         on_values(*headers);
@@ -96,24 +98,34 @@ namespace flyfish
 
                         auto b = headers.hasQueryParam("b") ? 
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
-                            std::numeric_limits<uint64_t>::max();
+                            std::numeric_limits<std::uint64_t>::max();
 
-                        auto c = headers.hasQueryParam("values") ? 
-                            boost::lexical_cast<std::size_t>(headers.getQueryParam("values")) :
+                        auto step = headers.hasQueryParam("step") ? 
+                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("step")) :
                             1;
+
+                        auto segment_size = headers.hasQueryParam("size") ? 
+                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("size")) :
+                            step;
+
+                        auto extract_func = headers.hasQueryParam("sum") ? 
+                            [](const flyfish::db::diff_result& r) { return r.sum;}:
+                            (headers.hasQueryParam("variance") ?  
+                             [](const flyfish::db::diff_result& r) { return r.variance;} : 
+                             [](const flyfish::db::diff_result& r) { return r.mean;});
 
                         if(headers.hasQueryParam("csv")) 
                         {
                             proxygen::ResponseBuilder(downstream_)
                                 .status(200, "OK")
-                                .body(values_csv(key, a, b, c))
+                                .body(values_csv(key, a, b, step, segment_size, extract_func))
                                 .sendWithEOM();
                         }
                         else
                         {
                             proxygen::ResponseBuilder(downstream_)
                                 .status(200, "OK")
-                                .body(values_json(key, a, b, c))
+                                .body(values_json(key, a, b, step, segment_size, extract_func))
                                 .sendWithEOM();
                         }
                     }
@@ -161,54 +173,64 @@ namespace flyfish
                     return folly::toJson(o);
                 }
 
-                std::string values_json(
-                        const std::string& key, 
-                        flyfish::db::time_type a, 
-                        flyfish::db::time_type b,
-                        std::size_t c)
-                {
-                    c = std::max<std::size_t>(1, c);
-                    c = std::min<std::size_t>(c, _max_values);
-                    if(a > b) std::swap(a, b);
-
-                    auto step = (b - a) / c;
-                    if(step == 0) throw std::runtime_error{SMALL_PRECISION_ERROR};
-                    
-
-                    folly::dynamic arr = folly::dynamic::array();
-
-                    for(auto e = a + step; a < b; a+=step,e+=step)
+                template<class extract_func>
+                    std::string values_json(
+                            const std::string& key, 
+                            flyfish::db::time_type a, 
+                            flyfish::db::time_type b,
+                            flyfish::db::time_type step,
+                            flyfish::db::time_type segment_size,
+                            extract_func extract_value)
                     {
-                        auto r = _db.diff(key, a, e);
-                        arr.push_back(r.sum);
+                        if(a > b) std::swap(a, b);
+                        if(step < 1) throw std::runtime_error{SMALL_PRECISION_STEP_ERROR};
+                        if(segment_size < 1) throw std::runtime_error{SMALL_PRECISION_SIZE_ERROR};
+
+                        folly::dynamic arr = folly::dynamic::array();
+
+                        auto s = a - segment_size;
+                        for(; a < b; s+=step, a+=step) 
+                        {
+                            const auto r = _db.diff(key, s, a);
+                            arr.push_back(extract_value(r));
+                        }
+
+                        return folly::toJson(arr);
                     }
-                    return folly::toJson(arr);
-                }
 
-                std::string values_csv(
-                        const std::string& key, 
-                        flyfish::db::time_type a, 
-                        flyfish::db::time_type b,
-                        std::size_t c)
-                {
-                    c = std::max<std::size_t>(1, c);
-                    c = std::min<std::size_t>(c, _max_values);
-                    if(a > b) std::swap(a, b);
-
-                    auto step = (b - a) / c;
-                    if(step == 0) throw std::runtime_error{SMALL_PRECISION_ERROR};
-
-                    std::stringstream s;
-                    auto e = a + step;
-                    auto r = _db.diff(key, a, e);
-                    s << r.sum;
-                    for(; a < b; a+=step,e+=step)
+                template<class extract_func>
+                    std::string values_csv(
+                            const std::string& key, 
+                            flyfish::db::time_type a, 
+                            flyfish::db::time_type b,
+                            flyfish::db::time_type step,
+                            flyfish::db::time_type segment_size,
+                            extract_func extract_value)
                     {
-                        r = _db.diff(key, a, e);
-                        s << "," << r.sum;
+                        if(a > b) std::swap(a, b);
+                        if(step < 1) throw std::runtime_error{SMALL_PRECISION_STEP_ERROR};
+                        if(segment_size < 1) throw std::runtime_error{SMALL_PRECISION_SIZE_ERROR};
+
+                        std::stringstream ss;
+
+                        //output all but last
+                        auto s = a - segment_size;
+                        const auto e = b - step;
+                        for(; a < e; s+=step, a+=step) 
+                        {
+                            const auto r = _db.diff(key, s, a);
+                            ss << extract_value(r) << ",";
+                        }
+
+                        //output last
+                        if(a < b)
+                        {
+                            const auto r = _db.diff(key, s, a);
+                            ss << extract_value(r);
+                        }
+
+                        return ss.str();
                     }
-                    return s.str();
-                }
 
             private:
                 threaded::server& _db;
