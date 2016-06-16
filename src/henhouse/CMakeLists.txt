@@ -7,22 +7,22 @@ file(GLOB src *.cpp)
 file(GLOB headers *.hpp)
 
 add_executable(
-    flyfish
+    henhouse
     ${src}
     ${moc_resources})
 
 target_link_libraries(
-    flyfish
-    flyfish_service
-    flyfish_db
-    flyfish_util
+    henhouse
+    henhouse_service
+    henhouse_db
+    henhouse_util
     ${Boost_LIBRARIES}
     ${MISC_LIBRARIES})
 
 add_dependencies(
-    flyfish 
-    flyfish_service
-    flyfish_db
-    flyfish_util)
+    henhouse 
+    henhouse_service
+    henhouse_db
+    henhouse_util)
 
-install(TARGETS flyfish DESTINATION bin)
+install(TARGETS henhouse DESTINATION bin)

@@ -5,7 +5,7 @@
 #include <fstream>
 #include <functional>
 
-namespace flyfish
+namespace henhouse
 {
     namespace db
     {

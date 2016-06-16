@@ -25,11 +25,11 @@ try
     const std::uint16_t http_port = 7070;
     const std::uint16_t http2_port = 7071;
 
-    flyfish::threaded::server db{WORKERS, "./tmp"};
+    henhouse::threaded::server db{WORKERS, "./tmp"};
 
     //setup put endpoing that mimics graphite
-    wangle::ServerBootstrap<flyfish::net::put_pipeline> put_server;
-    put_server.childPipeline(std::make_shared<flyfish::net::put_pipeline_factory>(db));
+    wangle::ServerBootstrap<henhouse::net::put_pipeline> put_server;
+    put_server.childPipeline(std::make_shared<henhouse::net::put_pipeline_factory>(db));
     put_server.bind(2003); //graphite receive port
 
 
@@ -45,7 +45,7 @@ try
     options.shutdownOn = {SIGINT, SIGTERM};
     options.enableContentCompression = true;
     options.handlerFactories = proxygen::RequestHandlerChain()
-        .addThen<flyfish::net::query_handler_factory>(db, MAX_VALUES)
+        .addThen<henhouse::net::query_handler_factory>(db, MAX_VALUES)
         .build();
 
     proxygen::HTTPServer query_server(std::move(options));

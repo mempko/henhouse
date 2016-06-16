@@ -9,7 +9,7 @@
 namespace bio = boost::iostreams;
 namespace bf =  boost::filesystem;
 
-namespace flyfish 
+namespace henhouse 
 {
     namespace util 
     {

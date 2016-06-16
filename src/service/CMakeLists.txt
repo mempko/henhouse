@@ -5,4 +5,4 @@ include_directories(..)
 
 file(GLOB src *.cpp)
 
-add_library(flyfish_service STATIC ${src})
+add_library(henhouse_service STATIC ${src})

@@ -9,7 +9,7 @@
 
 #include <folly/MPMCQueue.h>
 
-namespace flyfish
+namespace henhouse
 {
     namespace threaded
     {

@@ -18,7 +18,7 @@
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <boost/lexical_cast.hpp>
 
-namespace flyfish
+namespace henhouse
 {
     namespace net
     {
@@ -109,10 +109,10 @@ namespace flyfish
                             step;
 
                         auto extract_func = headers.hasQueryParam("sum") ? 
-                            [](const flyfish::db::diff_result& r) { return r.sum;}:
+                            [](const henhouse::db::diff_result& r) { return r.sum;}:
                             (headers.hasQueryParam("variance") ?  
-                             [](const flyfish::db::diff_result& r) { return r.variance;} : 
-                             [](const flyfish::db::diff_result& r) { return r.mean;});
+                             [](const henhouse::db::diff_result& r) { return r.variance;} : 
+                             [](const henhouse::db::diff_result& r) { return r.mean;});
 
                         if(headers.hasQueryParam("csv")) 
                         {
@@ -160,8 +160,8 @@ namespace flyfish
 
                 std::string diff(
                         const std::string& key, 
-                        flyfish::db::time_type a, 
-                        flyfish::db::time_type b)
+                        henhouse::db::time_type a, 
+                        henhouse::db::time_type b)
                 {
                     auto r = _db.diff(key, a, b);
                     folly::dynamic o = folly::dynamic::object
@@ -176,10 +176,10 @@ namespace flyfish
                 template<class extract_func>
                     std::string values_json(
                             const std::string& key, 
-                            flyfish::db::time_type a, 
-                            flyfish::db::time_type b,
-                            flyfish::db::time_type step,
-                            flyfish::db::time_type segment_size,
+                            henhouse::db::time_type a, 
+                            henhouse::db::time_type b,
+                            henhouse::db::time_type step,
+                            henhouse::db::time_type segment_size,
                             extract_func extract_value)
                     {
                         if(a > b) std::swap(a, b);
@@ -201,10 +201,10 @@ namespace flyfish
                 template<class extract_func>
                     std::string values_csv(
                             const std::string& key, 
-                            flyfish::db::time_type a, 
-                            flyfish::db::time_type b,
-                            flyfish::db::time_type step,
-                            flyfish::db::time_type segment_size,
+                            henhouse::db::time_type a, 
+                            henhouse::db::time_type b,
+                            henhouse::db::time_type step,
+                            henhouse::db::time_type segment_size,
                             extract_func extract_value)
                     {
                         if(a > b) std::swap(a, b);

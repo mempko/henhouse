@@ -1,7 +1,7 @@
-FlyFish
+HenHouse
 ========================
 
-FlyFish is a proof of concept for creating a fast time series DB that can compute
+HenHouse is a proof of concept for creating a fast time series DB that can compute
 sum, average, and variance between any two time ranges in basically constant time. 
 
 Limitation with the design is that pushing data to the DB must happen in the last
@@ -53,12 +53,12 @@ Download Dependencies.
 - [folly](https://github.com/facebook/folly)
 - [proxygen](https://github.com/facebook/proxygen)
 
-Go to flyfish project directory and
+Go to henhouse project directory and
 run...
 
     mkdir build
     cmake ..
     make -j
-    ./src/flyfish/flyfish
+    ./src/henhouse/henhouse
 
 

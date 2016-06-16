@@ -1,6 +1,6 @@
 #include "service/threaded.hpp"
 
-namespace flyfish
+namespace henhouse
 {
     namespace threaded
     {

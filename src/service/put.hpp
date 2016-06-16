@@ -10,7 +10,7 @@
 #include <wangle/codec/LineBasedFrameDecoder.h>
 #include <wangle/codec/StringCodec.h>
 
-namespace flyfish
+namespace henhouse
 {
     namespace net
     {

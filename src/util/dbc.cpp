@@ -6,7 +6,7 @@
 #include <execinfo.h>
 #endif
 
-namespace flyfish 
+namespace henhouse 
 {
     namespace util 
     {
