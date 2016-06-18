@@ -9,6 +9,8 @@ namespace henhouse
 {
     namespace db
     {
+        const offset_type ADD_BUCKET_BACK_LIMIT = 60;
+
         void propogate(data_item prev, data_item& current)
         {
             current.integral = prev.integral + current.value;
@@ -81,10 +83,19 @@ namespace henhouse
                     //bucket is current or in the past, no need to index.
                     if(pos < data.size())
                     {
-                        const auto prev = pos > 0 ? data[pos - 1] : data_item {0, 0, 0};
-                        update_current(prev, data[pos], c);
-                        for(auto p = pos + 1; p < data.size(); p++)
-                            propogate(data[p-1], data[p]);
+                        //if we are too far back in the range, skip it,
+                        //otherwise propogate the values up.
+                        //This limitation is to keep performance predictable for
+                        //inserts while providing a buffer for slow inserters
+                        //to catch up.
+                        if(data.size() - pos < ADD_BUCKET_BACK_LIMIT)
+                        {
+                            const auto prev = pos > 0 ? data[pos - 1] : data_item {0, 0, 0};
+                            update_current(prev, data[pos], c);
+                            for(auto p = pos + 1; p < data.size(); p++)
+                                propogate(data[p-1], data[p]);
+                        }
+                        else return false;
                     }
                     //if we move beyond end, append data 
                     else
