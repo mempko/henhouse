@@ -13,7 +13,7 @@ namespace henhouse
     namespace db 
     {
         using time_type = std::uint64_t;
-        using count_type = std::uint64_t;
+        using count_type = std::int64_t;
         using change_type = std::int64_t;
         using offset_type = std::uint64_t;
 
@@ -25,13 +25,13 @@ namespace henhouse
 
         struct index_metadata
         {
-            std::uint64_t size = 0 ;
-            std::uint64_t resolution = 0;
+            std::size_t size = 0 ;
+            time_type resolution = 0;
         };
 
         struct data_metadata
         {
-            std::uint64_t size = 0;
+            std::size_t size = 0;
         };
 
         struct data_item
@@ -42,7 +42,7 @@ namespace henhouse
         };
 
         const std::size_t DATA_SIZE = util::PAGE_SIZE;
-        const std::uint64_t DEFAULT_RESOLUTION = 1; //seconds
+        const time_type DEFAULT_RESOLUTION = 1; //seconds
         const std::size_t INDEX_SIZE = util::PAGE_SIZE;
         const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 

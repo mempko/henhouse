@@ -21,12 +21,12 @@ namespace henhouse
             propogate(prev, current);
         }
 
-        diff_result smooth_diff_bucket(time_type time_diff, data_item a, std::uint64_t resolution)
+        diff_result smooth_diff_bucket(time_type time_diff, data_item a, time_type resolution)
         {
             REQUIRE_GREATER(time_diff, 0);
             REQUIRE_GREATER_EQUAL(resolution, time_diff);
 
-            const auto sub_size = resolution / time_diff;
+            const count_type sub_size = resolution / time_diff;
             const auto sum = a.value / sub_size;
             const auto mean = sum;
             const auto variance = 0;
@@ -42,10 +42,9 @@ namespace henhouse
             };
         }
 
-        diff_result diff_buckets(data_item a, data_item b, std::size_t n)
+        diff_result diff_buckets(data_item a, data_item b, count_type n)
         {
-            REQUIRE_GREATER_EQUAL(b.integral, a.integral);
-            REQUIRE_GREATER_EQUAL(b.second_integral, a.second_integral);
+            REQUIRE_GREATER_EQUAL(n, 0);
 
             const auto sum = b.integral - a.integral;
             const auto second_sum = b.second_integral - a.second_integral;
