@@ -42,7 +42,7 @@ namespace henhouse
                         on_values(*headers);
                     else
                     {
-                        proxygen::ResponseBuilder(downstream_)
+                        proxygen::ResponseBuilder{downstream_}
                             .status(404, "Not Found")
                             .sendWithEOM();
                     }
@@ -50,13 +50,13 @@ namespace henhouse
                 }
                 catch(std::exception& e)
                 {
-                    proxygen::ResponseBuilder(downstream_)
+                    proxygen::ResponseBuilder{downstream_}
                         .status(500, e.what())
                         .sendWithEOM();
                 }
                 catch(...)
                 {
-                    proxygen::ResponseBuilder(downstream_)
+                    proxygen::ResponseBuilder{downstream_}
                         .status(500, "Unknown Error")
                         .sendWithEOM();
                 }
@@ -74,14 +74,14 @@ namespace henhouse
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
                             std::numeric_limits<uint64_t>::max();
 
-                        proxygen::ResponseBuilder(downstream_)
+                        proxygen::ResponseBuilder{downstream_}
                             .status(200, "OK")
                             .body(diff(key, a, b))
                             .sendWithEOM();
                     }
                     else
                     {
-                        proxygen::ResponseBuilder(downstream_)
+                        proxygen::ResponseBuilder{downstream_}
                             .status(422, "Missing Key")
                             .sendWithEOM();
                     }
@@ -116,14 +116,14 @@ namespace henhouse
 
                         if(headers.hasQueryParam("csv")) 
                         {
-                            proxygen::ResponseBuilder(downstream_)
+                            proxygen::ResponseBuilder{downstream_}
                                 .status(200, "OK")
                                 .body(values_csv(key, a, b, step, segment_size, extract_func))
                                 .sendWithEOM();
                         }
                         else
                         {
-                            proxygen::ResponseBuilder(downstream_)
+                            proxygen::ResponseBuilder{downstream_}
                                 .status(200, "OK")
                                 .body(values_json(key, a, b, step, segment_size, extract_func))
                                 .sendWithEOM();
@@ -131,7 +131,7 @@ namespace henhouse
                     }
                     else
                     {
-                        proxygen::ResponseBuilder(downstream_)
+                        proxygen::ResponseBuilder{downstream_}
                             .status(422, "Missing Key")
                             .sendWithEOM();
                     }
