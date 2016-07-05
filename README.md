@@ -8,18 +8,21 @@ Limitation with the design is that pushing data to the DB must happen in the las
 timestamp range because the DB stores a sums and sum of squares table along with
 actual values.
 
+Henhouse essentially uses the old school embedded signal processing technique of 
+using streaming versions of computing mean and variance.
+
 ![alt text](doc/graph.png "Time Graph")
 
 Design
 =========================
 
 There is an index and time data for each "key". The key, index and data together make a 
-timeline. Time ranges are broken up as continuous frames with buckets at a given 
+timeline. Timelines are broken up as continuous frames of time ranges with buckets at a given 
 time resolution. Each bucket contains the value of counts in that bucket, 
 a sum up to that bucket of all values, and a sum of squared values up to that bucket. 
-This is a 1D version of a summed area table with a second integral.
+This is a 1D version of a summed area table with a second integral. 
 
-Given two time ranges, you can compute sum, average, and variance in constant time.
+Given two buckets, you can compute sum, average, and variance in constant time.
 
 The index and data structures store the data using memory mapped files
 for optimal performance.
