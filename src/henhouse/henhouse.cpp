@@ -31,8 +31,8 @@ po::options_description create_descriptions()
         ("http_port", po::value<std::uint16_t>()->default_value(9090), "http port")
         ("http2_port", po::value<std::uint16_t>()->default_value(9091), "http 2.0 port")
         ("put_port", po::value<std::uint16_t>()->default_value(2003), "data input port")
-        ("data,d", po::value<std::string>()->default_value("/tmp"), "data directory");
-        ("query_workers", po::value<std::size_t>()->default_value(workers), "query threads");
+        ("data,d", po::value<std::string>()->default_value("/tmp"), "data directory")
+        ("query_workers", po::value<std::size_t>()->default_value(workers), "query threads")
         ("put_workers", po::value<std::size_t>()->default_value(workers), "put threads");
 
     return d;
