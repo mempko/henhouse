@@ -33,9 +33,15 @@ namespace henhouse
                     db::time_type t; 
                     std::int64_t c;
                     m >> key >> c >> t;
-                    if(c > 0) _db.put(key, t, c);
-                    close(ctx);
+                    _db.put(key, t, c);
                 }
+
+                virtual void readException(Context* ctx, folly::exception_wrapper e) override
+                {
+                    std::cerr << "put read error: " << exceptionStr(e) << std::endl;
+                }
+
+                virtual void readEOF(Context* ctx) override { close(ctx); }
 
             private:
                 threaded::server& _db;
