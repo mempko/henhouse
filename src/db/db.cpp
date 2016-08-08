@@ -16,7 +16,7 @@ namespace henhouse
         get_result timeline_db::get(const std::string& key, time_type t) const 
         {
             const auto& tl = get_tl(key);
-            return tl.get(t);
+            return tl.get_b(t);
         }
 
         bool timeline_db::put(const std::string& key, time_type t, count_type c)

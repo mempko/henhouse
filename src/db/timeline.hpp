@@ -112,11 +112,11 @@ namespace henhouse
 
         struct get_result
         {
-            time_type time;
+            time_type query_time;
+            time_type range_time;
             offset_type pos;
             offset_type offset;
             data_item value;
-            data_item prev_value;
         };
 
         struct diff_result
@@ -135,7 +135,12 @@ namespace henhouse
             data_type data;
 
             bool put(time_type t, count_type c);
-            get_result get(time_t t) const;  
+
+            //get_a returns the value at the bucket before time t bucket.
+            get_result get_a(time_type t) const;  
+            //get_v returns the value at the bucket at time t.
+            get_result get_b(time_type t) const;  
+
             diff_result diff(time_type a, time_type b) const;
         };
 

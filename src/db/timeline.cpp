@@ -125,22 +125,38 @@ namespace henhouse
             ENSURE_RANGE(r.pos + r.offset, 0, size);
         }
 
-        get_result timeline::get(time_t t) const  
+        get_result timeline::get_a(time_type t) const  
         {
             auto p = index.find_pos(t);
 
             clamp(p, data.size());
             const auto i = p.pos + p.offset;
-            const auto prev_dat = i > 0 ? data[i-1] : data_item{0,0,0};
-            const auto dat = data[i];
+            const auto dat = i > 0 ? data[i-1] : data_item{0,0,0};
 
             return get_result 
             { 
+                t - index.meta().resolution,
                 p.time, 
                 p.pos,
                 p.offset,
-                dat,
-                prev_dat
+                dat
+            };
+        }
+
+        get_result timeline::get_b(time_type t) const  
+        {
+            auto p = index.find_pos(t);
+
+            clamp(p, data.size());
+            const auto dat = data[p.pos + p.offset];
+
+            return get_result 
+            { 
+                t,
+                p.time, 
+                p.pos,
+                p.offset,
+                dat
             };
         }
 
@@ -157,24 +173,20 @@ namespace henhouse
             if(a > b) std::swap(a,b);
             if(data.size() == 0) return diff_result{ 0, 0, 0};
 
-            auto ar = get(a);
-            auto br = get(b);
+            auto ar = get_a(a);
+            auto br = get_b(b);
 
-            b = std::max(b, br.time);
-            a = within(a, ar.time, b);
+            b = std::max(br.query_time, br.range_time);
+            a = std::min(ar.query_time, b);
 
-            if(a == b) return diff_result{ 0, 0, 0 };
-
-            CHECK_GREATER_EQUAL(b, a);
-            CHECK_GREATER_EQUAL(br.pos, ar.pos);
+            CHECK_GREATER(b, a);
 
             const auto resolution = index.meta().resolution;
             const auto time_diff = b - a;
-            const auto n = (br.pos + br.offset) - (ar.pos + ar.offset);
+            const auto n = time_diff / resolution;
 
-            return n > 0 ? 
-                diff_buckets(ar.value, br.value, n) : 
-                diff_buckets(br.prev_value, br.value, 1);
+            CHECK_GREATER(n , 0);
+            return diff_buckets(ar.value, br.value, n);
         }
 
         timeline from_directory(const std::string& path) 
