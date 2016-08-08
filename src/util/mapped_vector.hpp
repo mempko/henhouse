@@ -50,8 +50,8 @@ namespace henhouse
 
                     std::uint64_t size() const 
                     {
-                        REQUIRE(_metadata)
-                            ENSURE_LESS_EQUAL(_metadata->size, _max_items);
+                        REQUIRE(_metadata);
+                        ENSURE_LESS_EQUAL(_metadata->size, _max_items);
                         return _metadata->size;
                     }
 

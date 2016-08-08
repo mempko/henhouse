@@ -114,20 +114,21 @@ namespace henhouse
                              [](const henhouse::db::diff_result& r) { return r.variance;} : 
                              [](const henhouse::db::diff_result& r) { return r.mean;});
 
+                        auto rb = proxygen::ResponseBuilder{downstream_};
+                        rb.status(200, "OK");
+
                         if(headers.hasQueryParam("csv")) 
                         {
-                            proxygen::ResponseBuilder{downstream_}
-                                .status(200, "OK")
-                                .body(values_csv(key, a, b, step, segment_size, extract_func))
-                                .sendWithEOM();
+                            values(rb, key, a, b, step, segment_size, extract_func);
                         }
                         else
                         {
-                            proxygen::ResponseBuilder{downstream_}
-                                .status(200, "OK")
-                                .body(values_json(key, a, b, step, segment_size, extract_func))
-                                .sendWithEOM();
+                            rb.body("[");
+                            values(rb, key, a, b, step, segment_size, extract_func);
+                            rb.body("]");
                         }
+
+                        rb.sendWithEOM();
                     }
                     else
                     {
@@ -174,7 +175,8 @@ namespace henhouse
                 }
 
                 template<class extract_func>
-                    std::string values_json(
+                    void values(
+                            proxygen::ResponseBuilder& rb,
                             const std::string& key, 
                             henhouse::db::time_type a, 
                             henhouse::db::time_type b,
@@ -185,33 +187,6 @@ namespace henhouse
                         if(a > b) std::swap(a, b);
                         if(step < 1) throw std::runtime_error{SMALL_PRECISION_STEP_ERROR};
                         if(segment_size < 1) throw std::runtime_error{SMALL_PRECISION_SIZE_ERROR};
-
-                        folly::dynamic arr = folly::dynamic::array();
-
-                        auto s = a - segment_size;
-                        for(; a < b; s+=step, a+=step) 
-                        {
-                            const auto r = _db.diff(key, s, a);
-                            arr.push_back(extract_value(r));
-                        }
-
-                        return folly::toJson(arr);
-                    }
-
-                template<class extract_func>
-                    std::string values_csv(
-                            const std::string& key, 
-                            henhouse::db::time_type a, 
-                            henhouse::db::time_type b,
-                            henhouse::db::time_type step,
-                            henhouse::db::time_type segment_size,
-                            extract_func extract_value)
-                    {
-                        if(a > b) std::swap(a, b);
-                        if(step < 1) throw std::runtime_error{SMALL_PRECISION_STEP_ERROR};
-                        if(segment_size < 1) throw std::runtime_error{SMALL_PRECISION_SIZE_ERROR};
-
-                        std::stringstream ss;
 
                         //output all but last
                         auto s = a - segment_size;
@@ -219,17 +194,16 @@ namespace henhouse
                         for(; a < e; s+=step, a+=step) 
                         {
                             const auto r = _db.diff(key, s, a);
-                            ss << extract_value(r) << ",";
+                            rb.body(boost::lexical_cast<std::string>(extract_value(r)));
+                            rb.body(",");
                         }
 
                         //output last
                         if(a < b)
                         {
                             const auto r = _db.diff(key, s, a);
-                            ss << extract_value(r);
+                            rb.body(boost::lexical_cast<std::string>(extract_value(r)));
                         }
-
-                        return ss.str();
                     }
 
             private:

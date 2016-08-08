@@ -115,6 +115,6 @@ try
 }
 catch(std::exception& e) 
 {
-    std::cerr << "Error! " << e.what() << std::endl;
+    std::cerr << "error, exiting: " << e.what() << std::endl;
     return 1;
 }

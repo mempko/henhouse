@@ -23,36 +23,15 @@ namespace henhouse
             propogate(prev, current);
         }
 
-        diff_result smooth_diff_bucket(time_type time_diff, data_item a, time_type resolution)
-        {
-            REQUIRE_GREATER(time_diff, 0);
-            REQUIRE_GREATER_EQUAL(resolution, time_diff);
-
-            const count_type sub_size = resolution / time_diff;
-            const auto sum = a.value / sub_size;
-            const auto mean = sum;
-            const auto variance = 0;
-            const change_type change = 0;
-
-            return diff_result 
-            { 
-                sum, 
-                    mean, 
-                    variance,
-                    change,
-                    0
-            };
-        }
-
         diff_result diff_buckets(data_item a, data_item b, count_type n)
         {
-            REQUIRE_GREATER_EQUAL(n, 0);
+            REQUIRE_GREATER(n, 0);
 
             const auto sum = b.integral - a.integral;
             const auto second_sum = b.second_integral - a.second_integral;
-            const auto mean = n > 0 ? sum / n : a.value;
+            const auto mean = sum / n;
             const auto mean_squared = mean * mean;
-            const auto second_mean = n > 0 ? second_sum / n : (a.value * a.value);
+            const auto second_mean = second_sum / n;
             const auto variance = second_mean - mean_squared;
             const change_type change = b.value > a.value ? (b.value - a.value) : -(a.value - b.value);
 
@@ -142,18 +121,26 @@ namespace henhouse
             const auto pos = r.pos + r.offset;
             if(pos < size) return;
             r.offset = size - r.pos - 1;
+
+            ENSURE_RANGE(r.pos + r.offset, 0, size);
         }
 
         get_result timeline::get(time_t t) const  
         {
             auto p = index.find_pos(t);
+
             clamp(p, data.size());
+            const auto i = p.pos + p.offset;
+            const auto prev_dat = i > 0 ? data[i-1] : data_item{0,0,0};
+            const auto dat = data[i];
+
             return get_result 
             { 
                 p.time, 
                 p.pos,
                 p.offset,
-                data[p.pos + p.offset] 
+                dat,
+                prev_dat
             };
         }
 
@@ -183,11 +170,11 @@ namespace henhouse
 
             const auto resolution = index.meta().resolution;
             const auto time_diff = b - a;
-            const auto n = time_diff / resolution;
+            const auto n = (br.pos + br.offset) - (ar.pos + ar.offset);
 
             return n > 0 ? 
                 diff_buckets(ar.value, br.value, n) : 
-                smooth_diff_bucket(time_diff, ar.value, resolution);
+                diff_buckets(br.prev_value, br.value, 1);
         }
 
         timeline from_directory(const std::string& path) 
