@@ -25,7 +25,7 @@ namespace henhouse
         class worker  
         {
             public: 
-                worker(const std::string & root, std::size_t queue_size);
+                worker(const std::string & root, std::size_t queue_size, std::size_t cache_size);
 
                 put_queue& queue() { return _queue;}
                 const put_queue & queue() const { return _queue;}
@@ -47,7 +47,11 @@ namespace henhouse
         class server  
         {
             public:
-                server(std::size_t workers, const std::string& root);
+                server(
+                        std::size_t workers, 
+                        const std::string& root, 
+                        std::size_t queue_size, 
+                        std::size_t cache_size);
 
                 db::get_result get(const std::string& key, db::time_type t) const; 
                 bool put(const std::string& key, db::time_type t, db::count_type c);

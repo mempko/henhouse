@@ -3,18 +3,24 @@
 
 #include "db/timeline.hpp"
 
-#include <unordered_map>
+#include <folly/Synchronized.h>
+#include <folly/EvictingCacheMap.h>
 
 namespace henhouse
 {
     namespace db
     {
-        using timeline_map = std::unordered_map<std::string, timeline>;
+        using safe_timeline = folly::Synchronized<timeline>;
+        using timeline_cache = folly::EvictingCacheMap<std::string, safe_timeline>;
+        using timeline_cache_ptr = std::unique_ptr<timeline_cache>;
+        using safe_timeline_cache = folly::Synchronized<timeline_cache_ptr>;
+        using locked_cache = safe_timeline_cache::LockedPtr;
 
         class timeline_db 
         {
             public:
-                timeline_db(const std::string& root) : _root{root} {} 
+                timeline_db(const std::string& root, std::size_t cache_size) : 
+                    _root{root}, _tls{std::make_unique<timeline_cache>(cache_size)} {} 
 
             public:
 
@@ -26,13 +32,12 @@ namespace henhouse
 
             private:
 
-                timeline& get_tl(const std::string& key);
-
-                const timeline& get_tl(const std::string& key) const;
+                safe_timeline get_tl(timeline_cache&, const std::string& key);
+                safe_timeline get_tl(timeline_cache&, const std::string& key) const;
 
             private:
                 bf::path _root;
-                mutable timeline_map _tls;
+                mutable safe_timeline_cache _tls;
         };
     }
 }

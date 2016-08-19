@@ -51,6 +51,7 @@ namespace henhouse
             time_type time;
             offset_type pos;
             offset_type offset;
+            bool empty;
         };
 
         class index_type : public util::mapped_vector<index_metadata, index_item>
@@ -90,18 +91,22 @@ namespace henhouse
                     auto offset = offset_time / _metadata->resolution;
                     const auto pos = range->pos + offset;
 
+                    bool empty = false;
                     //if we are not in last range, then check for overlap
                     //with next index element
                     if(next != cend() && pos >= next->pos)
+                    {
                         offset = next->pos - range->pos - 1;
-                    return pos_result{range->time, range->pos, offset};
+                        empty = true;
+                    }
+                    return pos_result{range->time, range->pos, offset, empty};
                 }
 
                 pos_result find_pos(time_type t) const
                 {
-                    if(size() == 0) return pos_result {t, 0, 0};
+                    if(size() == 0) return pos_result {t, 0, 0, true};
                     const auto range = find_range(t);
-                    if(range == nullptr) return pos_result{front().time, 0, 0};
+                    if(range == nullptr) return pos_result{front().time, 0, 0, true};
                     return find_pos_from_range(t, range, range + 1);
                 }
         };

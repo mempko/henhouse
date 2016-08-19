@@ -6,8 +6,8 @@ namespace henhouse
     {
         const std::size_t QUEUE_SIZE = 1000;
 
-        worker::worker(const std::string & root, std::size_t queue_size) : 
-            _db{root}, _queue{queue_size} {} 
+        worker::worker(const std::string & root, std::size_t queue_size, std::size_t cache_size) : 
+            _db{root, cache_size}, _queue{queue_size} {} 
 
         void put_thread(worker_ptr w) 
         {
@@ -25,14 +25,20 @@ namespace henhouse
 
         }
 
-        server::server(std::size_t workers, const std::string& root) : _root{root} 
+        server::server(
+                std::size_t workers, 
+                const std::string& root, 
+                std::size_t queue_size,
+                std::size_t cache_size) : _root{root} 
         {
             REQUIRE_GREATER(workers, 0);
+            REQUIRE_GREATER(queue_size, 0);
+            REQUIRE_GREATER(cache_size, 0);
 
             while(--workers)
             {
 
-                auto w = std::make_shared<worker>(_root, QUEUE_SIZE);
+                auto w = std::make_shared<worker>(_root, queue_size, cache_size);
                 _workers.emplace_back(w);
 
                 auto t = std::make_shared<std::thread>(put_thread, w);

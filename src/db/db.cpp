@@ -15,58 +15,73 @@ namespace henhouse
 
         get_result timeline_db::get(const std::string& key, time_type t) const 
         {
-            const auto& tl = get_tl(key);
-            return tl.get_b(t);
+            SYNCHRONIZED(c, _tls)
+            {
+                auto tl = get_tl(*c, key);
+                return tl->get_b(t);
+            }
         }
 
-        bool timeline_db::put(const std::string& key, time_type t, count_type c)
+        bool timeline_db::put(const std::string& key, time_type t, count_type count)
         {
-            auto& tl = get_tl(key);
-            return tl.put(t, c);
+            SYNCHRONIZED(c, _tls)
+            {
+                auto tl = get_tl(*c, key);
+                return tl->put(t, count);
+            }
         }
 
         diff_result timeline_db::diff(const std::string& key, time_type a, time_type b) const
         {
-            const auto& tl = get_tl(key);
-            return tl.diff(a, b);
+            SYNCHRONIZED(c, _tls)
+            {
+                auto tl = get_tl(*c, key);
+                return tl->diff(a, b);
+            }
         }
 
         std::size_t timeline_db::key_index_size(const std::string& key) const
         {
-            const auto& tl = get_tl(key);
-            return tl.index.size();
+            SYNCHRONIZED(c, _tls)
+            {
+                auto tl = get_tl(*c, key);
+                return tl->index.size();
+            }
         }
 
         std::size_t timeline_db::key_data_size(const std::string& key) const
         {
-            const auto& tl = get_tl(key);
-            return tl.data.size();
+            SYNCHRONIZED(c, _tls)
+            {
+                auto tl = get_tl(*c, key);
+                return tl->data.size();
+            }
         }
 
-        timeline& timeline_db::get_tl(const std::string& key)
+        safe_timeline timeline_db::get_tl(timeline_cache& c, const std::string& key)
         {
             const auto clean_key = sanatize_key(key);
-            auto t = _tls.find(clean_key);
-            if(t != std::end(_tls)) return t->second;
+            auto t = c.find(clean_key);
+            if(t != std::end(c)) return t->second;
 
             bf::path key_dir = _root / clean_key;
 
-            auto p = _tls.insert(std::make_pair(clean_key, 
-                        from_directory(key_dir.string())));
-            return p.first->second;
+            c.set(clean_key, safe_timeline{from_directory(key_dir.string())});
+            auto p = c.find(clean_key);
+            return p->second;
         }
 
-        const timeline& timeline_db::get_tl(const std::string& key) const
+        safe_timeline timeline_db::get_tl(timeline_cache& c, const std::string& key) const
         {
             const auto clean_key = sanatize_key(key);
-            auto t = _tls.find(clean_key);
-            if(t != std::end(_tls)) return t->second;
+            auto t = c.find(clean_key);
+            if(t != std::end(c)) return t->second;
 
             bf::path key_dir = _root / clean_key;
 
-            auto p = _tls.insert(std::make_pair(clean_key, 
-                        from_directory(key_dir.string())));
-            return p.first->second;
+            c.set(clean_key, safe_timeline{from_directory(key_dir.string())});
+            auto p = c.find(clean_key);
+            return p->second;
         }
     }
 }

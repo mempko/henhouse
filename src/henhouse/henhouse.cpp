@@ -33,7 +33,11 @@ po::options_description create_descriptions()
         ("put_port", po::value<std::uint16_t>()->default_value(2003), "data input port")
         ("data,d", po::value<std::string>()->default_value("/tmp"), "data directory")
         ("query_workers", po::value<std::size_t>()->default_value(workers), "query threads")
-        ("put_workers", po::value<std::size_t>()->default_value(workers), "put threads");
+        ("put_workers", po::value<std::size_t>()->default_value(workers), "put threads")
+        ("queue_size", po::value<std::size_t>()->default_value(1000), "input queue size")
+        ("cache_size", po::value<std::size_t>()->default_value(20), 
+          "size of timeline db reference cache per worker. "
+          "make this too big an you can run out of file descriptors.");
 
     return d;
 }
@@ -67,9 +71,10 @@ try
     const auto query_workers = opt["query_workers"].as<std::size_t>();
     const auto put_workers = opt["put_workers"].as<std::size_t>();
     const auto data_dir = opt["data"].as<std::string>();
+    const auto queue_size = opt["queue_size"].as<std::size_t>();
+    const auto cache_size = opt["cache_size"].as<std::size_t>();
 
-
-    henhouse::threaded::server db{put_workers, data_dir};
+    henhouse::threaded::server db{put_workers, data_dir, queue_size, cache_size};
 
     //setup put endpoing that mimics graphite
     wangle::ServerBootstrap<henhouse::net::put_pipeline> put_server;

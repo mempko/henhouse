@@ -130,7 +130,7 @@ namespace henhouse
             auto p = index.find_pos(t);
 
             clamp(p, data.size());
-            const auto i = p.pos + p.offset;
+            const auto i = p.pos + p.offset + (p.empty ? 1 : 0);
             const auto dat = i > 0 ? data[i-1] : data_item{0,0,0};
 
             return get_result 

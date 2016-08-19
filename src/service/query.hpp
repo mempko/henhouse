@@ -191,7 +191,7 @@ namespace henhouse
                         //output all but last
                         auto s = a - segment_size;
                         const auto e = b - step;
-                        for(; a < e; s+=step, a+=step) 
+                        for(; a <= e; s+=step, a+=step) 
                         {
                             const auto r = _db.diff(key, s, a);
                             rb.body(boost::lexical_cast<std::string>(extract_value(r)));
@@ -199,7 +199,7 @@ namespace henhouse
                         }
 
                         //output last
-                        if(a < b)
+                        if(a <= b)
                         {
                             const auto r = _db.diff(key, s, a);
                             rb.body(boost::lexical_cast<std::string>(extract_value(r)));
