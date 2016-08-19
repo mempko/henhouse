@@ -94,9 +94,9 @@ namespace henhouse
                     bool empty = false;
                     //if we are not in last range, then check for overlap
                     //with next index element
-                    if(next != cend() && pos >= next->pos)
+                    if(pos >= next->pos)
                     {
-                        offset = next->pos - range->pos - 1;
+                        if(next != cend()) offset = next->pos - range->pos - 1;
                         empty = true;
                     }
                     return pos_result{range->time, range->pos, offset, empty};

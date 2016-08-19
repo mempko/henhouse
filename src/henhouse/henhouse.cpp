@@ -34,7 +34,7 @@ po::options_description create_descriptions()
         ("data,d", po::value<std::string>()->default_value("/tmp"), "data directory")
         ("query_workers", po::value<std::size_t>()->default_value(workers), "query threads")
         ("put_workers", po::value<std::size_t>()->default_value(workers), "put threads")
-        ("queue_size", po::value<std::size_t>()->default_value(1000), "input queue size")
+        ("queue_size", po::value<std::size_t>()->default_value(10000), "input queue size")
         ("cache_size", po::value<std::size_t>()->default_value(20), 
           "size of timeline db reference cache per worker. "
           "make this too big an you can run out of file descriptors.");
@@ -74,6 +74,7 @@ try
     const auto queue_size = opt["queue_size"].as<std::size_t>();
     const auto cache_size = opt["cache_size"].as<std::size_t>();
 
+    boost::filesystem::create_directories(data_dir);
     henhouse::threaded::server db{put_workers, data_dir, queue_size, cache_size};
 
     //setup put endpoing that mimics graphite
