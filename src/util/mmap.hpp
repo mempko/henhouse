@@ -13,7 +13,10 @@ namespace henhouse
 {
     namespace util 
     {
+        using mapped_file_ptr = std::shared_ptr<bio::mapped_file>;
+
         const std::size_t PAGE_SIZE = bio::mapped_file::alignment();
+        const float GROW_FACTOR = 1.5;
 
         void open(bio::mapped_file& file, bf::path path, std::size_t new_size);
 
@@ -22,7 +25,7 @@ namespace henhouse
             {
                 REQUIRE_GREATER_EQUAL(new_size, sizeof(T));
 
-                const auto size = std::max(new_size, sizeof(T));
+                const auto size = std::max(PAGE_SIZE, std::max(new_size, sizeof(T)));
 
                 open(file, path, size);
 

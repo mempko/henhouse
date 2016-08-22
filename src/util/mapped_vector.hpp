@@ -4,6 +4,8 @@
 #include "util/dbc.hpp"
 #include "util/mmap.hpp"
 
+#include <memory>
+
 namespace henhouse 
 {
     namespace util 
@@ -16,24 +18,31 @@ namespace henhouse
                     mapped_vector(
                             const bf::path& meta_file, 
                             const bf::path& data_file, 
-                            const std::size_t new_size = PAGE_SIZE) 
+                            const size_t new_size = PAGE_SIZE,
+                            const float new_size_factor = GROW_FACTOR) 
                     {
-                        _data_file_path = data_file;
                         _new_size = new_size;
+                        _data_file_path = data_file;
+                        _new_size_factor = new_size_factor;
 
                         //open index metadata
-                        _metadata = open_as<meta_t>(_meta_file, meta_file);
+                        _meta_file = std::make_shared<bio::mapped_file>();
+                        _metadata = open_as<meta_t>(*_meta_file, meta_file);
 
                         //open index data. New file size is new_size
-                        open(_data_file, data_file, new_size);
-                        _items = reinterpret_cast<data_type*>(_data_file.data());
+                        _data_file = std::make_shared<bio::mapped_file>();
+                        open(*_data_file, data_file, new_size);
+                        _items = reinterpret_cast<data_type*>(_data_file->data());
 
                         //compute max elements
-                        _max_items = _data_file.size() / sizeof(data_type);
+                        _max_items = _data_file->size() / sizeof(data_type);
                         CHECK_LESS_EQUAL(_metadata->size, _max_items);
 
+                        ENSURE(_meta_file);
+                        ENSURE(_data_file);
                         ENSURE(_metadata != nullptr);
                         ENSURE(_items != nullptr);
+                        ENSURE_LESS_EQUAL(_metadata->size, _max_items);
                     }
 
                     meta_t& meta() 
@@ -51,7 +60,7 @@ namespace henhouse
                     std::uint64_t size() const 
                     {
                         REQUIRE(_metadata);
-                        ENSURE_LESS_EQUAL(_metadata->size, _max_items);
+                        REQUIRE_LESS_EQUAL(_metadata->size, _max_items);
                         return _metadata->size;
                     }
 
@@ -75,14 +84,24 @@ namespace henhouse
 
                     void push_back(const data_type& v) 
                     {
+                        REQUIRE(_data_file);
                         REQUIRE(_metadata);
+                        REQUIRE_LESS_EQUAL(_metadata->size, _max_items);
+
                         const auto next_pos = _metadata->size;
 
                         if(next_pos >= _max_items)
-                            resize(_data_file.size() + _new_size);
+                        {
+                            auto new_size = std::max(
+                                    static_cast<std::size_t>(_data_file->size() + sizeof(data_type)), 
+                                    (static_cast<std::size_t>(_data_file->size() * _new_size_factor) + sizeof(data_type)));
+                            resize(new_size);
+                        }
 
                         _metadata->size++;
                         _items[next_pos] = v;
+
+                        ENSURE_GREATER_EQUAL(_max_items, _metadata->size);
                     }
 
                     data_type* begin() 
@@ -148,19 +167,25 @@ namespace henhouse
 
                     void resize(size_t new_size) 
                     {
-                        _data_file.resize(new_size);
-                        _items = reinterpret_cast<data_type*>(_data_file.data());
-                        _max_items = _data_file.size() / sizeof(data_type);
-                    }
+                        REQUIRE(_data_file);
+                        REQUIRE_GREATER(new_size, _data_file->size());
+                        const auto old_max = _max_items;
 
+                        _data_file->resize(new_size);
+
+                        _items = reinterpret_cast<data_type*>(_data_file->data());
+                        _max_items = _data_file->size() / sizeof(data_type);
+                        ENSURE_GREATER(_max_items, old_max);
+                    }
 
                 protected:
                     meta_t* _metadata = nullptr;
                     data_type* _items = nullptr;
-                    std::size_t _max_items = 0;
                     std::size_t _new_size = 0;
-                    bio::mapped_file _meta_file;
-                    bio::mapped_file _data_file;
+                    std::size_t _max_items = 0;
+                    float _new_size_factor = 0;
+                    mapped_file_ptr _meta_file;
+                    mapped_file_ptr _data_file;
                     bf::path _data_file_path;
             };
     }

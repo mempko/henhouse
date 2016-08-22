@@ -16,7 +16,7 @@ namespace henhouse
             {
                 bio::mapped_file_params p;
                 p.path = path.string();
-                p.new_file_size = new_size;
+                p.new_file_size = std::max(new_size, PAGE_SIZE);
                 p.flags = bio::mapped_file::readwrite;
 
                 file.open(p);

@@ -42,7 +42,7 @@ namespace henhouse
         };
 
         const std::size_t DATA_SIZE = util::PAGE_SIZE;
-        const time_type DEFAULT_RESOLUTION = 10; //seconds
+        const time_type DEFAULT_RESOLUTION = 5; //seconds
         const std::size_t INDEX_SIZE = util::PAGE_SIZE;
         const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
