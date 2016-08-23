@@ -22,7 +22,7 @@ sub put(@keys)
     {
         my $c = (0..10).pick;
         my $k = @keys.pick;
-        $s.print("{$k} {$c} {now.prosix}\n");
+        $s.print("{$k} {$c} {DateTime.now.posix}\n");
         sleep 0.01;
     }
 }
@@ -32,7 +32,7 @@ sub get(@keys)
     my $http = HTTP::Client.new;
     loop 
     {
-        my $b = now.posix;
+        my $b = DateTime.now.posix;
         my $a = $b - 120;
         my $k = @keys.pick;
         my $req = "http://localhost:9999/values?a=$a&b=$b&key=$k&step=5&size=5&sum";
