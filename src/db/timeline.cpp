@@ -121,6 +121,7 @@ namespace henhouse
             const auto pos = r.pos + r.offset;
             if(pos < size) return;
             r.offset = size - r.pos - 1;
+            r.empty = true;
 
             ENSURE_RANGE(r.pos + r.offset, 0, size);
         }
