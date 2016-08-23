@@ -168,13 +168,13 @@ namespace henhouse
                     void resize(size_t new_size) 
                     {
                         REQUIRE(_data_file);
-                        REQUIRE_GREATER(new_size, _data_file->size());
+                        REQUIRE_GREATER_EQUAL(new_size, _data_file->size() + sizeof(data_type));
                         const auto old_max = _max_items;
 
                         _data_file->resize(new_size);
-
                         _items = reinterpret_cast<data_type*>(_data_file->data());
                         _max_items = _data_file->size() / sizeof(data_type);
+
                         ENSURE_GREATER(_max_items, old_max);
                     }
 
