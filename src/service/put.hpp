@@ -33,6 +33,9 @@ namespace henhouse
                     db::time_type t; 
                     std::int64_t c;
                     m >> key >> c >> t;
+
+                    if(key.empty()) return;
+
                     _db.put(key, t, c);
                 }
 

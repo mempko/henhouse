@@ -3,15 +3,52 @@
 #include <algorithm>
 #include <functional>
 
+#include <boost/regex.hpp>
+
 namespace henhouse
 {
     namespace db
     {
-        std::string sanatize_key(const std::string& key)
+        namespace 
         {
-            //clean up key here
-            return key;
+            std::string sanatize_key(const std::string& key)
+            {
+                std::string res;
+                res.resize(key.size());
+                std::transform(std::begin(key), std::end(key),
+                        std::begin(res),
+                        [](char c) {
+                            switch(c)
+                            {
+                                case ':':
+                                case '/':
+                                case ' ':
+                                case '~':
+                                case '&':
+                                case '*':
+                                case '@':
+                                case '#':
+                                case '>':
+                                case '<':
+                                case '^':
+                                return '.';
+                            }
+                            return c;
+                        }
+                        );
+                return res;
+            }
+
+            bf::path get_key_dir(const bf::path root, const std::string& key)
+            {
+                REQUIRE(!key.empty());
+                if(key.size() <=2)
+                    return root / key;
+
+                return root / key.substr(0, 2) / key.substr(2);
+            }
         }
+
 
         get_result timeline_db::get(const std::string& key, time_type t) const 
         {
@@ -46,10 +83,12 @@ namespace henhouse
         timeline& timeline_db::get_tl(const std::string& key)
         {
             const auto clean_key = sanatize_key(key);
-            auto t = _tls.find(clean_key);
+            const auto t = _tls.find(clean_key);
             if(t != std::end(_tls)) return t->second;
 
-            bf::path key_dir = _root / clean_key;
+            bf::path key_dir = get_key_dir(_root, clean_key);
+
+            if(!bf::exists(key_dir)) bf::create_directories(key_dir);
 
             _tls.set(clean_key, from_directory(key_dir.string()));
             auto p = _tls.find(clean_key);
@@ -59,10 +98,12 @@ namespace henhouse
         const timeline& timeline_db::get_tl(const std::string& key) const
         {
             const auto clean_key = sanatize_key(key);
-            auto t = _tls.find(clean_key);
+            const auto t = _tls.find(clean_key);
             if(t != std::end(_tls)) return t->second;
 
-            bf::path key_dir = _root / clean_key;
+            bf::path key_dir = get_key_dir(_root, clean_key);
+
+            if(!bf::exists(key_dir)) bf::create_directories(key_dir);
 
             _tls.set(clean_key, from_directory(key_dir.string()));
             auto p = _tls.find(clean_key);

@@ -37,7 +37,10 @@ sub corrupt_msg($msg is rw, @chars)
 sub put(@keys)
 {
     my $s = IO::Socket::INET.new(:host<localhost>, :port<2003>);
-    my @replacement-chars = "a".."z";
+    my @letters = "a".."z";
+    my @nums = 1..100;
+    my @stuff = <& * / : @ ~ &>;
+    my @replacement-chars = @stuff.append: @letters.append: @nums;
     loop 
     {
         my $c = (0..10).pick;
