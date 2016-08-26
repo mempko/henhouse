@@ -201,14 +201,11 @@ namespace henhouse
             timeline t;
             t.key = root.filename().string();
 
-            bf::path idx_meta = root / "im";
-            bf::path idx_data = root / "id";
-            t.index = std::move(index_type{idx_meta, idx_data});
+            bf::path idx_data = root / "i";
+            t.index = std::move(index_type{idx_data});
 
-            bf::path cmeta = root / "m";
             bf::path cdata = root / "d";
-
-            t.data = std::move(data_type{cmeta, cdata, DATA_SIZE});
+            t.data = std::move(data_type{cdata, DATA_SIZE});
 
             return t;
         }

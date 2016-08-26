@@ -22,6 +22,11 @@ namespace henhouse
 {
     namespace net
     {
+
+        const std::size_t MAX_QUERY_SIZE = 10000;
+        const std::string QUERY_TOO_LARGE = 
+            "query size is too large. Max query must be under 10000 values";
+
         const std::string SMALL_PRECISION_STEP_ERROR  = 
             "cannot go beyond second precision, for step";
 
@@ -191,6 +196,10 @@ namespace henhouse
                         //output all but last
                         auto s = a - segment_size;
                         const auto e = b - step;
+
+                        const auto query_size = (e - a) / step;
+                        if(query_size > MAX_QUERY_SIZE) throw std::runtime_error{QUERY_TOO_LARGE};
+
                         for(; a <= e; s+=step, a+=step) 
                         {
                             const auto r = _db.diff(key, s, a);

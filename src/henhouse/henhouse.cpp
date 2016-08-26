@@ -35,7 +35,7 @@ po::options_description create_descriptions()
         ("query_workers", po::value<std::size_t>()->default_value(workers), "query threads")
         ("put_workers", po::value<std::size_t>()->default_value(workers), "put threads")
         ("queue_size", po::value<std::size_t>()->default_value(10000), "input queue size")
-        ("cache_size", po::value<std::size_t>()->default_value(20), 
+        ("cache_size", po::value<std::size_t>()->default_value(40), 
           "size of timeline db reference cache per worker. "
           "make this too big an you can run out of file descriptors.");
 

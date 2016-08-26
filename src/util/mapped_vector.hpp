@@ -16,29 +16,28 @@ namespace henhouse
                 public:
                     mapped_vector(){};
                     mapped_vector(
-                            const bf::path& meta_file, 
                             const bf::path& data_file, 
                             const size_t new_size = PAGE_SIZE,
                             const float new_size_factor = GROW_FACTOR) 
                     {
-                        _new_size = new_size;
+                        _new_size = std::max(new_size, sizeof(meta_t) + sizeof(data_type));
                         _data_file_path = data_file;
                         _new_size_factor = new_size_factor;
 
-                        //open index metadata
-                        _meta_file = std::make_shared<bio::mapped_file>();
-                        _metadata = open_as<meta_t>(*_meta_file, meta_file);
-
                         //open index data. New file size is new_size
                         _data_file = std::make_shared<bio::mapped_file>();
-                        open(*_data_file, data_file, new_size);
-                        _items = reinterpret_cast<data_type*>(_data_file->data());
+                        const bool created = open(*_data_file, data_file, new_size);
+
+                        _metadata = reinterpret_cast<meta_t*>(_data_file->data());
+                        _items = reinterpret_cast<data_type*>(_data_file->data() + sizeof(meta_t));
+
+                        if(created) 
+                            *_metadata = meta_t{};
 
                         //compute max elements
-                        _max_items = _data_file->size() / sizeof(data_type);
+                        _max_items = (_data_file->size() - sizeof(meta_t)) / sizeof(data_type);
                         CHECK_LESS_EQUAL(_metadata->size, _max_items);
 
-                        ENSURE(_meta_file);
                         ENSURE(_data_file);
                         ENSURE(_metadata != nullptr);
                         ENSURE(_items != nullptr);
@@ -172,8 +171,9 @@ namespace henhouse
                         const auto old_max = _max_items;
 
                         _data_file->resize(new_size);
-                        _items = reinterpret_cast<data_type*>(_data_file->data());
-                        _max_items = _data_file->size() / sizeof(data_type);
+                        _metadata = reinterpret_cast<meta_t*>(_data_file->data());
+                        _items = reinterpret_cast<data_type*>(_data_file->data() + sizeof(meta_t));
+                        _max_items = (_data_file->size() - sizeof(meta_t)) / sizeof(data_type);
 
                         ENSURE_GREATER(_max_items, old_max);
                     }
@@ -184,7 +184,6 @@ namespace henhouse
                     std::size_t _new_size = 0;
                     std::size_t _max_items = 0;
                     float _new_size_factor = 0;
-                    mapped_file_ptr _meta_file;
                     mapped_file_ptr _data_file;
                     bf::path _data_file_path;
             };

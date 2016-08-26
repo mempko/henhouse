@@ -58,8 +58,8 @@ namespace henhouse
         {
             public:
                 index_type() : util::mapped_vector<index_metadata, index_item>{} {};
-                index_type(const bf::path& meta_file, const bf::path& data_file) :
-                    util::mapped_vector<index_metadata, index_item>{meta_file, data_file, INDEX_SIZE}
+                index_type(const bf::path& data_file) :
+                    util::mapped_vector<index_metadata, index_item>{data_file, INDEX_SIZE}
                 {
                     REQUIRE(_metadata);
 

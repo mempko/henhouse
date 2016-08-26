@@ -15,31 +15,74 @@ sub MAIN($workers, $a, $z)
     await Promise.allof(@ps);
 }
 
+sub replace_rand_char($s is rw, @chars) 
+{
+    my $size = $s.chars;
+    my $range = $size-1;
+    my $idx = (0..$range).pick;
+    my $new-char = @chars.pick;
+    $s.substr-rw($idx,1) = $new-char;
+}
+
+sub corrupt_msg($msg is rw, @chars) 
+{
+    my $size = $msg.chars;
+    my $chars = (1..$size).pick / 10;
+
+    for 0..$chars -> $c {
+        replace_rand_char($msg, @chars);
+    }
+}
+
 sub put(@keys)
 {
     my $s = IO::Socket::INET.new(:host<localhost>, :port<2003>);
+    my @replacement-chars = "a".."z";
     loop 
     {
         my $c = (0..10).pick;
         my $k = @keys.pick;
-        $s.print("{$k} {$c} {DateTime.now.posix}\n");
+        my $msg = "{$k} {$c} {DateTime.now.posix}";
+        if (0..100).pick < 5 {
+            corrupt_msg($msg, @replacement-chars);
+        }
+        $s.print("$msg\n");
         sleep 0.01;
+
+        CATCH {
+            default {
+                say .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
+            }
+        }
     }
 }
 
 sub get(@keys)
 {
     my $http = HTTP::Client.new;
+    my @letters = "a".."z";
+    my @nums = 1..100;
+    my @replacement-chars = @letters.append: @nums;
     loop 
     {
         my $b = DateTime.now.posix;
         my $a = $b - 120;
         my $k = @keys.pick;
-        my $req = "http://localhost:9999/values?a=$a&b=$b&key=$k&step=5&size=5&sum";
+        my $args = "values?a=$a&b=$b&key=$k&step=5&size=5&sum";
+        if (0..100).pick < 5 {
+            corrupt_msg($args, @replacement-chars);
+        }
+        my $req = "http://localhost:9999/$args";
         my $past = now;
         my $r = $http.get($req);
         my $req_time = now - $past;
-        say "$req = {$r.content} $req_time";
+        say "$req = {$r.status} {$r.content} $req_time";
         sleep 0.01;
+
+        CATCH {
+            default {
+                say .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
+            }
+        }
     }
 }
