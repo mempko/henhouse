@@ -4,6 +4,7 @@
 #include "service/threaded.hpp"
 
 #include <sstream>
+#include <ctime>
 
 #include <wangle/bootstrap/ServerBootstrap.h>
 #include <wangle/channel/AsyncSocketHandler.h>
@@ -15,6 +16,7 @@ namespace henhouse
     namespace net
     {
         typedef wangle::Pipeline<folly::IOBufQueue&, std::string> put_pipeline;
+        const std::uint64_t TOLERANCE=60*10; //10 minute tolerance
 
         class put_handler : public wangle::HandlerAdapter<std::string> 
         {
@@ -35,6 +37,10 @@ namespace henhouse
                     m >> key >> c >> t;
 
                     if(key.empty()) return;
+
+                    //don't allow puts too far into the future
+                    const auto now = std::time(nullptr);
+                    if(t > (now + TOLERANCE)) return;
 
                     _db.put(key, t, c);
                 }
