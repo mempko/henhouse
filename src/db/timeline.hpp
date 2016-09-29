@@ -61,15 +61,15 @@ namespace henhouse
                 index_type(const bf::path& data_file) :
                     util::mapped_vector<index_metadata, index_item>{data_file, INDEX_SIZE}
                 {
-                    REQUIRE(_metadata);
+                    INVARIANT(_metadata);
 
                     if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
                 }
 
                 const index_item* find_range(time_type t) const 
                 {
-                    REQUIRE(_metadata);
-                    REQUIRE(_items);
+                    INVARIANT(_metadata);
+                    INVARIANT(_items);
 
                     auto r = std::upper_bound(cbegin(), cend(), t, 
                             [](time_type l, const auto& r) { return l < r.time;});
@@ -82,7 +82,7 @@ namespace henhouse
                         const index_item* range, 
                         const index_item* next) const
                 {
-                    REQUIRE(_metadata);
+                    INVARIANT(_metadata);
                     REQUIRE(range);
                     REQUIRE(next);
 

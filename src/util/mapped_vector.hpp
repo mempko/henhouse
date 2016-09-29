@@ -46,27 +46,27 @@ namespace henhouse
 
                     meta_t& meta() 
                     {
-                        REQUIRE(_metadata);
+                        INVARIANT(_metadata);
                         return *_metadata;
                     }
 
                     const meta_t& meta() const
                     {
-                        REQUIRE(_metadata);
+                        INVARIANT(_metadata);
                         return *_metadata;
                     }
 
                     std::uint64_t size() const 
                     {
-                        REQUIRE(_metadata);
-                        REQUIRE_LESS_EQUAL(_metadata->size, _max_items);
+                        INVARIANT(_metadata);
+                        INVARIANT_LESS_EQUAL(_metadata->size, _max_items);
                         return _metadata->size;
                     }
 
                     const data_type& operator[](size_t pos) const 
                     {
-                        REQUIRE(_metadata); 
-                        REQUIRE(_items); 
+                        INVARIANT(_metadata); 
+                        INVARIANT(_items); 
                         REQUIRE_LESS(pos, _metadata->size);
 
                         return _items[pos];
@@ -74,8 +74,8 @@ namespace henhouse
 
                     data_type& operator[](size_t pos)
                     {
-                        REQUIRE(_metadata); 
-                        REQUIRE(_items); 
+                        INVARIANT(_metadata); 
+                        INVARIANT(_items); 
                         REQUIRE_LESS(pos, _metadata->size);
 
                         return _items[pos];
@@ -83,8 +83,8 @@ namespace henhouse
 
                     void push_back(const data_type& v) 
                     {
-                        REQUIRE(_data_file);
-                        REQUIRE(_metadata);
+                        INVARIANT(_data_file);
+                        INVARIANT(_metadata);
                         REQUIRE_LESS_EQUAL(_metadata->size, _max_items);
 
                         const auto next_pos = _metadata->size;
@@ -105,27 +105,27 @@ namespace henhouse
 
                     data_type* begin() 
                     { 
-                        REQUIRE(_items);
+                        INVARIANT(_items);
                         return _items;
                     }
 
                     data_type* end() 
                     { 
-                        REQUIRE(_items);
-                        REQUIRE(_metadata);
+                        INVARIANT(_items);
+                        INVARIANT(_metadata);
                         return _items + size();
                     }
 
                     data_type* begin() const
                     { 
-                        REQUIRE(_items);
+                        INVARIANT(_items);
                         return _items;
                     }
 
                     data_type* end() const
                     { 
-                        REQUIRE(_items);
-                        REQUIRE(_metadata);
+                        INVARIANT(_items);
+                        INVARIANT(_metadata);
                         return _items + size();
                     }
 
@@ -136,28 +136,28 @@ namespace henhouse
 
                     data_type& front()
                     {
-                        REQUIRE(_items);
+                        INVARIANT(_items);
                         return *_items;
                     }
 
                     const data_type& front() const
                     {
-                        REQUIRE(_items);
+                        INVARIANT(_items);
                         return *_items;
                     }
 
                     data_type& back()
                     {
-                        REQUIRE(_items);
-                        REQUIRE(_metadata);
+                        INVARIANT(_items);
+                        INVARIANT(_metadata);
                         REQUIRE_GREATER(_metadata->size, 0);
                         return *(_items + (_metadata->size - 1));
                     }
 
                     const data_type& back() const
                     {
-                        REQUIRE(_items);
-                        REQUIRE(_metadata);
+                        INVARIANT(_items);
+                        INVARIANT(_metadata);
                         REQUIRE_GREATER(_metadata->size, 0);
                         return *(_items + (_metadata->size - 1));
                     }
@@ -166,8 +166,9 @@ namespace henhouse
 
                     void resize(size_t new_size) 
                     {
-                        REQUIRE(_data_file);
+                        INVARIANT(_data_file);
                         REQUIRE_GREATER_EQUAL(new_size, _data_file->size() + sizeof(data_type));
+
                         const auto old_max = _max_items;
 
                         _data_file->resize(new_size);
