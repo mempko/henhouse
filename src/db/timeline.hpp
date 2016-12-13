@@ -48,6 +48,7 @@ namespace henhouse
 
         struct pos_result
         {
+            offset_type index_offset;
             time_type time;
             offset_type pos;
             offset_type offset;
@@ -66,12 +67,13 @@ namespace henhouse
                     if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
                 }
 
-                const index_item* find_range(time_type t) const 
+                const index_item* find_range(time_type t, const offset_type offset) const 
                 {
+                    REQUIRE_LESS(offset, size());
                     INVARIANT(_metadata);
                     INVARIANT(_items);
 
-                    auto r = std::upper_bound(cbegin(), cend(), t, 
+                    auto r = std::upper_bound(cbegin() + offset, cend(), t, 
                             [](time_type l, const auto& r) { return l < r.time;});
 
                     return r != cbegin() ? r - 1: nullptr;
@@ -99,14 +101,16 @@ namespace henhouse
                         offset = next->pos - range->pos - 1;
                         empty = true;
                     }
-                    return pos_result{range->time, range->pos, offset, empty};
+                    const offset_type index_offset = range - cbegin();
+                    return pos_result{index_offset, range->time, range->pos, offset, empty};
                 }
 
-                pos_result find_pos(time_type t) const
+                pos_result find_pos(time_type t, const offset_type offset) const
                 {
-                    if(size() == 0) return pos_result {t, 0, 0, true};
-                    const auto range = find_range(t);
-                    if(range == nullptr) return pos_result{front().time, 0, 0, true};
+                    if(size() == 0) return pos_result {0, t, 0, 0, true};
+                    const auto range = find_range(t, offset);
+                    if(range == nullptr) return pos_result{0, front().time, 0, 0, true};
+
                     return find_pos_from_range(t, range, range + 1);
                 }
         };
@@ -117,6 +121,7 @@ namespace henhouse
 
         struct get_result
         {
+            offset_type index_offset;
             time_type query_time;
             time_type range_time;
             offset_type pos;
@@ -126,6 +131,7 @@ namespace henhouse
 
         struct diff_result
         {
+            offset_type index_offset;
             count_type sum;
             count_type mean;
             count_type variance;
@@ -142,11 +148,11 @@ namespace henhouse
             bool put(time_type t, count_type c);
 
             //get_a returns the value at the bucket before time t bucket.
-            get_result get_a(time_type t) const;  
+            get_result get_a(time_type t, const offset_type index_offset) const;  
             //get_v returns the value at the bucket at time t.
-            get_result get_b(time_type t) const;  
+            get_result get_b(time_type t, const offset_type index_offset) const;  
 
-            diff_result diff(time_type a, time_type b) const;
+            diff_result diff(time_type a, time_type b, const offset_type index_offset) const;
         };
 
         timeline from_directory(const std::string& path);

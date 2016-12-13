@@ -11,6 +11,7 @@ namespace henhouse
     {
         namespace 
         {
+            const offset_type NO_OFFSET = 0;
             std::string sanatize_key(const std::string& key)
             {
                 std::string res;
@@ -41,7 +42,7 @@ namespace henhouse
         get_result timeline_db::get(const std::string& key, time_type t) const 
         {
             const auto& tl = get_tl(key);
-            return tl.get_b(t);
+            return tl.get_b(t, NO_OFFSET);
         }
 
         bool timeline_db::put(const std::string& key, time_type t, count_type count)
@@ -50,10 +51,10 @@ namespace henhouse
             return tl.put(t, count);
         }
 
-        diff_result timeline_db::diff(const std::string& key, time_type a, time_type b) const
+        diff_result timeline_db::diff(const std::string& key, time_type a, time_type b, const offset_type index_offset) const
         {
             const auto& tl = get_tl(key);
-            return tl.diff(a, b);
+            return tl.diff(a, b, index_offset);
         }
 
         std::size_t timeline_db::key_index_size(const std::string& key) const

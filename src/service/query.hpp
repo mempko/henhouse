@@ -33,6 +33,8 @@ namespace henhouse
         const std::string SMALL_PRECISION_SIZE_ERROR  = 
             "cannot go beyond second precision, for segment size";
 
+        const db::offset_type NO_OFFSET = 0;
+
         class query_request_handler : public proxygen::RequestHandler {
             public:
                 explicit query_request_handler(threaded::server& db, const std::size_t max_values) : 
@@ -169,7 +171,7 @@ namespace henhouse
                         henhouse::db::time_type a, 
                         henhouse::db::time_type b)
                 {
-                    auto r = _db.diff(key, a, b);
+                    auto r = _db.diff(key, a, b, NO_OFFSET);
                     folly::dynamic o = folly::dynamic::object
                         ("sum", r.sum)
                         ("mean", r.mean)
@@ -200,9 +202,12 @@ namespace henhouse
                         const auto query_size = (e - a) / step;
                         if(query_size > MAX_QUERY_SIZE) throw std::runtime_error{QUERY_TOO_LARGE};
 
+                        auto prev_index_offset = 0;
+
                         for(; a <= e; s+=step, a+=step) 
                         {
-                            const auto r = _db.diff(key, s, a);
+                            const auto r = _db.diff(key, s, a, prev_index_offset);
+                            prev_index_offset = r.index_offset;
                             rb.body(boost::lexical_cast<std::string>(extract_value(r)));
                             rb.body(",");
                         }
@@ -210,7 +215,7 @@ namespace henhouse
                         //output last
                         if(a <= b)
                         {
-                            const auto r = _db.diff(key, s, a);
+                            const auto r = _db.diff(key, s, a, prev_index_offset);
                             rb.body(boost::lexical_cast<std::string>(extract_value(r)));
                         }
                     }

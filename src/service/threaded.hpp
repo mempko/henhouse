@@ -28,6 +28,7 @@ namespace henhouse
             db::time_type a;
             db::time_type b;
             db::count_type count;
+            db::offset_type index_offset;
 
             get_promise* get_result;;
             diff_promise* diff_result;
@@ -68,7 +69,7 @@ namespace henhouse
 
                 db::get_result get(const std::string& key, db::time_type t) const; 
                 void put(const std::string& key, db::time_type t, db::count_type c);
-                db::diff_result diff(const std::string& key, db::time_type a, db::time_type b) const;
+                db::diff_result diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const;
 
             private:
 

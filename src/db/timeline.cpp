@@ -36,7 +36,7 @@ namespace henhouse
          *          = (mean of squared x) - mean^2
          *          = (mean of squared x) - (mean squared)
          */
-        diff_result diff_buckets(data_item a, data_item b, count_type n)
+        diff_result diff_buckets(const offset_type index_offset, data_item a, data_item b, count_type n)
         {
             REQUIRE_GREATER(n, 0);
 
@@ -50,6 +50,7 @@ namespace henhouse
 
             return diff_result 
             { 
+                index_offset,
                 sum, 
                 mean, 
                 variance,
@@ -139,9 +140,9 @@ namespace henhouse
             ENSURE_RANGE(r.pos + r.offset, 0, size);
         }
 
-        get_result timeline::get_a(time_type t) const  
+        get_result timeline::get_a(time_type t, const offset_type index_offset) const  
         {
-            auto p = index.find_pos(t);
+            auto p = index.find_pos(t, index_offset);
 
             clamp(p, data.size());
             const auto i = p.pos + p.offset + (p.empty ? 1 : 0);
@@ -149,6 +150,7 @@ namespace henhouse
 
             return get_result 
             { 
+                p.index_offset,
                 t - index.meta().resolution,
                 p.time, 
                 p.pos,
@@ -157,15 +159,16 @@ namespace henhouse
             };
         }
 
-        get_result timeline::get_b(time_type t) const  
+        get_result timeline::get_b(time_type t, const offset_type index_offset) const  
         {
-            auto p = index.find_pos(t);
+            auto p = index.find_pos(t, index_offset);
 
             clamp(p, data.size());
             const auto dat = data[p.pos + p.offset];
 
             return get_result 
             { 
+                p.index_offset,
                 t,
                 p.time, 
                 p.pos,
@@ -182,13 +185,13 @@ namespace henhouse
                 return v;
             }
 
-        diff_result timeline::diff(time_type a, time_type b) const
+        diff_result timeline::diff(time_type a, time_type b, const offset_type index_offset) const
         {
             if(a > b) std::swap(a,b);
-            if(data.size() == 0) return diff_result{ 0, 0, 0};
+            if(data.size() == 0) return diff_result{ 0, 0, 0, 0};
 
-            auto ar = get_a(a);
-            auto br = get_b(b);
+            auto ar = get_a(a, index_offset);
+            auto br = get_b(b, index_offset);
 
             b = std::max(br.query_time, br.range_time);
             a = std::min(ar.query_time, b);
@@ -200,7 +203,8 @@ namespace henhouse
             const auto n = time_diff / resolution;
 
             CHECK_GREATER(n , 0);
-            return diff_buckets(ar.value, br.value, n);
+            CHECK_LESS_EQUAL(ar.index_offset, br.index_offset);
+            return diff_buckets(ar.index_offset, ar.value, br.value, n);
         }
 
         timeline from_directory(const std::string& path) 

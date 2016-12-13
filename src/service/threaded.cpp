@@ -51,7 +51,7 @@ namespace henhouse
                         try
                         {
                             REQUIRE(r.diff_result);
-                            r.diff_result->set_value(db.diff(r.key, r.a, r.b));
+                            r.diff_result->set_value(db.diff(r.key, r.a, r.b, r.index_offset));
                         }
                         catch(std::exception& e) 
                         {
@@ -117,7 +117,7 @@ namespace henhouse
             return f.get();
         }
 
-        db::diff_result server::diff(const std::string& key, db::time_type a, db::time_type b) const
+        db::diff_result server::diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const
         {
             auto n = worker_num(key);
 
@@ -126,6 +126,7 @@ namespace henhouse
             r.key = key;
             r.a = a;
             r.b = b;
+            r.index_offset = index_offset;
             diff_promise p;
             diff_future f = p.get_future();
             r.diff_result = &p;
