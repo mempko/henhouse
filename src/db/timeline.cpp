@@ -23,6 +23,19 @@ namespace henhouse
             propogate(prev, current);
         }
 
+        /**
+         *
+         * Mean is computing as the (running sum of x) / N.
+         * In addition, variance requires maintaining the running sum of x^2
+         *
+         * mean = sum(x) / N
+         * mean of squared x = sum(x^2) / N
+         *
+         * variance = (sum(x^2) / N) - (sum(x) / N )^2
+         *          = (sum(x^2) / N) - mean^2
+         *          = (mean of squared x) - mean^2
+         *          = (mean of squared x) - (mean squared)
+         */
         diff_result diff_buckets(data_item a, data_item b, count_type n)
         {
             REQUIRE_GREATER(n, 0);
