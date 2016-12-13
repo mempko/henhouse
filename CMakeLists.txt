@@ -8,6 +8,10 @@ include_directories(..)
 
 #setup boost
 set(Boost_USE_STATIC_LIBS on)
+set(Boost_USE_MULTITHREADED ON)
+unset(Boost_INCLUDE_DIR CACHE)
+unset(Boost_LIBRARY_DIRS CACHE)
+
 find_package(Boost COMPONENTS system program_options filesystem regex iostreams thread serialization REQUIRED)
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(
