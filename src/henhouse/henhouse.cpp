@@ -54,7 +54,6 @@ po::variables_map parse_options(int argc, char* argv[], po::options_description&
 int main(int argc, char** argv)
 try
 {
-
     auto description = create_descriptions();
     auto opt = parse_options(argc, argv, description);
 

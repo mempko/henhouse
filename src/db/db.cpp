@@ -17,25 +17,13 @@ namespace henhouse
                 res.resize(key.size());
                 std::transform(std::begin(key), std::end(key),
                         std::begin(res),
-                        [](char c) {
-                            switch(c)
-                            {
-                                case ':':
-                                case '/':
-                                case ' ':
-                                case '~':
-                                case '&':
-                                case '*':
-                                case '@':
-                                case '#':
-                                case '>':
-                                case '<':
-                                case '^':
-                                return '.';
-                            }
-                            return c;
-                        }
-                        );
+                        [](char c)
+                        {
+                            if((c >= '0' && c <= '9') ||
+                               (c >= 'A' && c <= 'Z') ||
+                               (c >= 'a' && c <= 'Z')) return c;
+                            else return '.';
+                        });
                 return res;
             }
 
