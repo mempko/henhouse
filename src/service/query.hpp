@@ -18,6 +18,8 @@
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <boost/lexical_cast.hpp>
 
+namespace hdb = henhouse::db;
+
 namespace henhouse
 {
     namespace net
@@ -98,6 +100,8 @@ namespace henhouse
                 {
                     if(headers.hasQueryParam("key"))
                     {
+                        auto rb = proxygen::ResponseBuilder{downstream_};
+
                         auto key = headers.getQueryParam("key");
                         auto a = headers.hasQueryParam("a") ? 
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
@@ -116,25 +120,38 @@ namespace henhouse
                             step;
 
                         auto extract_func = headers.hasQueryParam("sum") ? 
-                            [](const henhouse::db::diff_result& r) { return r.sum;}:
+                            [](const hdb::diff_result& r) { return r.sum;}:
                             (headers.hasQueryParam("variance") ?  
-                             [](const henhouse::db::diff_result& r) { return r.variance;} : 
-                             [](const henhouse::db::diff_result& r) { return r.mean;});
+                             [](const hdb::diff_result& r) { return r.variance;} : 
+                             [](const hdb::diff_result& r) { return r.mean;});
 
-                        auto rb = proxygen::ResponseBuilder{downstream_};
-                        rb.status(200, "OK");
+                        auto render_func = headers.hasQueryParam("xy") ? 
+                            [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
+                            {
+                                rb.body("{\"x\":");
+                                rb.body(boost::lexical_cast<std::string>(t));
+                                rb.body(",\"y\":");
+                                rb.body(boost::lexical_cast<std::string>(v));
+                                rb.body("}");
+                            } :
+                            [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
+                            {
+                                rb.body(boost::lexical_cast<std::string>(v));
+                            };
+
 
                         if(headers.hasQueryParam("csv")) 
                         {
-                            values(rb, key, a, b, step, segment_size, extract_func);
+                            values(rb, key, a, b, step, segment_size, render_func, extract_func);
                         }
                         else
                         {
                             rb.body("[");
-                            values(rb, key, a, b, step, segment_size, extract_func);
+                            values(rb, key, a, b, step, segment_size, render_func, extract_func);
                             rb.body("]");
                         }
 
+                        rb.status(200, "OK");
                         rb.sendWithEOM();
                     }
                     else
@@ -168,8 +185,8 @@ namespace henhouse
 
                 std::string diff(
                         const std::string& key, 
-                        henhouse::db::time_type a, 
-                        henhouse::db::time_type b)
+                        hdb::time_type a, 
+                        hdb::time_type b)
                 {
                     auto r = _db.diff(key, a, b, NO_OFFSET);
                     folly::dynamic o = folly::dynamic::object
@@ -181,14 +198,15 @@ namespace henhouse
                     return folly::toJson(o);
                 }
 
-                template<class extract_func>
+                template<class render_func, class extract_func>
                     void values(
                             proxygen::ResponseBuilder& rb,
                             const std::string& key, 
-                            henhouse::db::time_type a, 
-                            henhouse::db::time_type b,
-                            henhouse::db::time_type step,
-                            henhouse::db::time_type segment_size,
+                            hdb::time_type a, 
+                            hdb::time_type b,
+                            hdb::time_type step,
+                            hdb::time_type segment_size,
+                            render_func render_value,
                             extract_func extract_value)
                     {
                         if(a > b) std::swap(a, b);
@@ -208,7 +226,7 @@ namespace henhouse
                         {
                             const auto r = _db.diff(key, s, a, prev_index_offset);
                             prev_index_offset = r.index_offset;
-                            rb.body(boost::lexical_cast<std::string>(extract_value(r)));
+                            render_value(rb, a, extract_value(r));
                             rb.body(",");
                         }
 
@@ -216,7 +234,7 @@ namespace henhouse
                         if(a <= b)
                         {
                             const auto r = _db.diff(key, s, a, prev_index_offset);
-                            rb.body(boost::lexical_cast<std::string>(extract_value(r)));
+                            render_value(rb, a, extract_value(r));
                         }
                     }
 
