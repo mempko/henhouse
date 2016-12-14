@@ -22,8 +22,8 @@ namespace henhouse
                         {
                             if((c >= '0' && c <= '9') ||
                                (c >= 'A' && c <= 'Z') ||
-                               (c >= 'a' && c <= 'Z')) return c;
-                            else return '.';
+                               (c >= 'a' && c <= 'z')) return c;
+                            else return '_';
                         });
                 return res;
             }
