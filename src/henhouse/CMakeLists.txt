@@ -8,8 +8,7 @@ file(GLOB headers *.hpp)
 
 add_executable(
     henhouse
-    ${src}
-    ${moc_resources})
+    ${src})
 
 target_link_libraries(
     henhouse
