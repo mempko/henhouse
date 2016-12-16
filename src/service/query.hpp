@@ -12,19 +12,25 @@
 #include <folly/Portability.h>
 #include <folly/json.h>
 #include <folly/io/async/EventBaseManager.h>
+
 #include <proxygen/httpserver/HTTPServer.h>
 #include <proxygen/httpserver/RequestHandler.h>
 #include <proxygen/httpserver/RequestHandlerFactory.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
+
 #include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 
 namespace hdb = henhouse::db;
+namespace ba = boost::algorithm;
 
 namespace henhouse
 {
     namespace net
     {
-
         const std::size_t MAX_QUERY_SIZE = 10000;
         const std::string QUERY_TOO_LARGE = 
             "query size is too large. Max query must be under 10000 values";
@@ -98,11 +104,20 @@ namespace henhouse
 
                 void on_values(proxygen::HTTPMessage& headers)
                 {
-                    if(headers.hasQueryParam("key"))
+                    if(headers.hasQueryParam("keys"))
                     {
                         auto rb = proxygen::ResponseBuilder{downstream_};
 
-                        auto key = headers.getQueryParam("key");
+                        auto keys = headers.getQueryParam("keys");
+
+                        if(keys.empty()) 
+                        {
+                            proxygen::ResponseBuilder{downstream_}
+                                .status(422, "The Keys parameter must be a comma separated list")
+                                .sendWithEOM();
+                            return;
+                        }
+
                         auto a = headers.hasQueryParam("a") ? 
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
                             0;
@@ -125,7 +140,9 @@ namespace henhouse
                              [](const hdb::diff_result& r) { return r.variance;} : 
                              [](const hdb::diff_result& r) { return r.mean;});
 
-                        auto render_func = headers.hasQueryParam("xy") ? 
+                        bool is_csv = headers.hasQueryParam("csv");
+
+                        auto render_func = !is_csv && headers.hasQueryParam("xy") ? 
                             [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
                             {
                                 rb.body("{\"x\":");
@@ -140,16 +157,7 @@ namespace henhouse
                             };
 
 
-                        if(headers.hasQueryParam("csv")) 
-                        {
-                            values(rb, key, a, b, step, segment_size, render_func, extract_func);
-                        }
-                        else
-                        {
-                            rb.body("[");
-                            values(rb, key, a, b, step, segment_size, render_func, extract_func);
-                            rb.body("]");
-                        }
+                        render_values(rb, keys, a, b, step, segment_size, render_func, extract_func, is_csv);
 
                         rb.status(200, "OK");
                         rb.sendWithEOM();
@@ -157,7 +165,7 @@ namespace henhouse
                     else
                     {
                         proxygen::ResponseBuilder{downstream_}
-                            .status(422, "Missing Key")
+                            .status(422, "Missing keys parameter")
                             .sendWithEOM();
                     }
                 }
@@ -199,7 +207,52 @@ namespace henhouse
                 }
 
                 template<class render_func, class extract_func>
-                    void values(
+                    void render_values(
+                            proxygen::ResponseBuilder& rb,
+                            const std::string& keys, 
+                            hdb::time_type a, 
+                            hdb::time_type b,
+                            hdb::time_type step,
+                            hdb::time_type segment_size,
+                            render_func render_value,
+                            extract_func extract_value,
+                            bool is_csv)
+                {
+                        auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
+                        decltype(first_key) end_key_split{};
+
+                        if(is_csv) 
+                        {
+                            for(auto it = first_key; it != end_key_split; it++)
+                            {
+                                std::string key{it->begin(), it->end()};
+                                rb.body(",");
+                                render_key_values(rb, key, a, b, step, segment_size, render_value, extract_value);
+                                rb.body("\n");
+                            }
+
+                        }
+                        else
+                        {
+                            rb.body("{");
+                            for(auto it = first_key; it != end_key_split; it++)
+                            {
+                                if(it != first_key) rb.body(",");
+                                std::string key{it->begin(), it->end()};
+                                rb.body("\"");
+                                rb.body(key);
+                                rb.body("\":");
+                                rb.body("[");
+                                render_key_values(rb, key, a, b, step, segment_size, render_value, extract_value);
+                                rb.body("]");
+                            }
+                            rb.body("}");
+                        }
+
+                }
+
+                template<class render_func, class extract_func>
+                    void render_key_values(
                             proxygen::ResponseBuilder& rb,
                             const std::string& key, 
                             hdb::time_type a, 
@@ -222,6 +275,7 @@ namespace henhouse
 
                         auto prev_index_offset = 0;
 
+                        //TODO: Create iterator in db that can do this walk.
                         for(; a <= e; s+=step, a+=step) 
                         {
                             const auto r = _db.diff(key, s, a, prev_index_offset);
