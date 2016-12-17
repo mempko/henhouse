@@ -78,9 +78,18 @@ namespace henhouse
 
                 void on_diff(proxygen::HTTPMessage& headers) 
                 {
-                    if(headers.hasQueryParam("key"))
+                    auto rb = proxygen::ResponseBuilder{downstream_};
+
+                    if(headers.hasQueryParam("keys"))
                     {
-                        auto key = headers.getQueryParam("key");
+                        auto keys = headers.getQueryParam("keys");
+
+                        if(keys.empty()) 
+                        {
+                            rb.status(422, "The Keys parameter must be a comma separated list").sendWithEOM();
+                            return;
+                        }
+
                         auto a = headers.hasQueryParam("a") ? 
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
                             0;
@@ -89,32 +98,38 @@ namespace henhouse
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
                             std::numeric_limits<uint64_t>::max();
 
-                        proxygen::ResponseBuilder{downstream_}
-                            .status(200, "OK")
-                            .body(diff(key, a, b))
-                            .sendWithEOM();
+                        auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
+                        decltype(first_key) end_key_split{};
+
+                        folly::dynamic out = folly::dynamic::object;
+                        for(auto it = first_key; it != end_key_split; it++)
+                        {
+                            std::string key{it->begin(), it->end()};
+                            out[key] = diff(key, a, b);
+                        }
+
+                        rb.body(folly::toJson(out))
+                          .status(200, "OK")
+                          .sendWithEOM();
                     }
                     else
                     {
-                        proxygen::ResponseBuilder{downstream_}
-                            .status(422, "Missing Key")
-                            .sendWithEOM();
+                        rb.status(422, "Missing keys parameter").sendWithEOM();
                     }
                 }
 
                 void on_values(proxygen::HTTPMessage& headers)
                 {
+                    auto rb = proxygen::ResponseBuilder{downstream_};
+
                     if(headers.hasQueryParam("keys"))
                     {
-                        auto rb = proxygen::ResponseBuilder{downstream_};
 
                         auto keys = headers.getQueryParam("keys");
 
                         if(keys.empty()) 
                         {
-                            proxygen::ResponseBuilder{downstream_}
-                                .status(422, "The Keys parameter must be a comma separated list")
-                                .sendWithEOM();
+                            rb.status(422, "The Keys parameter must be a comma separated list").sendWithEOM();
                             return;
                         }
 
@@ -151,22 +166,19 @@ namespace henhouse
                                 rb.body(boost::lexical_cast<std::string>(v));
                                 rb.body("}");
                             } :
-                            [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
-                            {
-                                rb.body(boost::lexical_cast<std::string>(v));
-                            };
+                        [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
+                        {
+                            rb.body(boost::lexical_cast<std::string>(v));
+                        };
 
 
                         render_values(rb, keys, a, b, step, segment_size, render_func, extract_func, is_csv);
 
-                        rb.status(200, "OK");
-                        rb.sendWithEOM();
+                        rb.status(200, "OK").sendWithEOM();
                     }
                     else
                     {
-                        proxygen::ResponseBuilder{downstream_}
-                            .status(422, "Missing keys parameter")
-                            .sendWithEOM();
+                        rb.status(422, "Missing keys parameter").sendWithEOM();
                     }
                 }
 
@@ -191,7 +203,7 @@ namespace henhouse
 
             private:
 
-                std::string diff(
+                folly::dynamic diff(
                         const std::string& key, 
                         hdb::time_type a, 
                         hdb::time_type b)
@@ -202,8 +214,8 @@ namespace henhouse
                         ("mean", r.mean)
                         ("variance", r.variance)
                         ("change", r.change)
-                        ("size", r.size);
-                    return folly::toJson(o);
+                        ("points", r.size);
+                    return o;
                 }
 
                 template<class render_func, class extract_func>
