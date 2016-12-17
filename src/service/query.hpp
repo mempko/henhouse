@@ -23,6 +23,8 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+#include <ctime>
+
 
 namespace hdb = henhouse::db;
 namespace ba = boost::algorithm;
@@ -95,8 +97,10 @@ namespace henhouse
                             0;
 
                         auto b = headers.hasQueryParam("b") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
-                            std::numeric_limits<uint64_t>::max();
+                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) : 
+                            std::time(0);
+
+                        if(a > b) std::swap(a, b);
 
                         auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
                         decltype(first_key) end_key_split{};
@@ -139,7 +143,9 @@ namespace henhouse
 
                         auto b = headers.hasQueryParam("b") ? 
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
-                            std::numeric_limits<std::uint64_t>::max();
+                            std::time(0);
+
+                        if(a > b) std::swap(a, b);
 
                         auto step = headers.hasQueryParam("step") ? 
                             boost::lexical_cast<std::uint64_t>(headers.getQueryParam("step")) :
@@ -208,6 +214,8 @@ namespace henhouse
                         hdb::time_type a, 
                         hdb::time_type b)
                 {
+                    REQUIRE_GREATER_EQUAL(b, a);
+
                     auto r = _db.diff(key, a, b, NO_OFFSET);
                     folly::dynamic o = folly::dynamic::object
                         ("sum", r.sum)
@@ -274,7 +282,8 @@ namespace henhouse
                             render_func render_value,
                             extract_func extract_value)
                     {
-                        if(a > b) std::swap(a, b);
+                        REQUIRE_GREATER_EQUAL(b, a);
+
                         if(step < 1) throw std::runtime_error{SMALL_PRECISION_STEP_ERROR};
                         if(segment_size < 1) throw std::runtime_error{SMALL_PRECISION_SIZE_ERROR};
 

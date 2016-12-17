@@ -196,6 +196,8 @@ namespace henhouse
             b = std::max(br.query_time, br.range_time);
             a = std::min(ar.query_time, b);
 
+            if(a == b) return diff_result{ 0, 0, 0, 0};
+
             CHECK_GREATER(b, a);
 
             const auto resolution = index.meta().resolution;
