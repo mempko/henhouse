@@ -63,6 +63,11 @@ namespace henhouse
                         return _metadata->size;
                     }
 
+                    bool empty() const
+                    {
+                        return size() == 0;
+                    }
+
                     const data_type& operator[](size_t pos) const 
                     {
                         INVARIANT(_metadata); 

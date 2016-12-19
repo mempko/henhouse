@@ -14,11 +14,13 @@ namespace henhouse
 {
     namespace threaded
     {
-        enum req_type { put, get, diff};
+        enum req_type { put, get, diff, summary};
         using get_promise = std::promise<db::get_result>;
         using get_future = std::future<db::get_result>;
         using diff_promise = std::promise<db::diff_result>;
         using diff_future = std::future<db::diff_result>;
+        using summary_promise = std::promise<db::summary_result>;
+        using summary_future = std::future<db::summary_result>;
 
         struct req
         {
@@ -32,6 +34,7 @@ namespace henhouse
 
             get_promise* get_result;;
             diff_promise* diff_result;
+            summary_promise* summary_result;
         };
 
         using req_queue= folly::MPMCQueue<req>;
@@ -67,6 +70,7 @@ namespace henhouse
                         std::size_t queue_size, 
                         std::size_t cache_size);
 
+                db::summary_result summary(const std::string& key) const; 
                 db::get_result get(const std::string& key, db::time_type t) const; 
                 void put(const std::string& key, db::time_type t, db::count_type c);
                 db::diff_result diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const;

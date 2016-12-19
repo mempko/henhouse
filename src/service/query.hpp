@@ -54,6 +54,8 @@ namespace henhouse
                 try
                 {
                     if(headers->getPath() == "/summary") 
+                        on_summary(*headers);
+                    else if(headers->getPath() == "/diff") 
                         on_diff(*headers);
                     else if(headers->getPath() == "/values") 
                         on_values(*headers);
@@ -77,6 +79,41 @@ namespace henhouse
                         .status(500, "Unknown Error")
                         .sendWithEOM();
                 }
+
+                void on_summary(proxygen::HTTPMessage& headers) 
+                {
+                    auto rb = proxygen::ResponseBuilder{downstream_};
+
+                    if(headers.hasQueryParam("keys"))
+                    {
+                        auto keys = headers.getQueryParam("keys");
+
+                        if(keys.empty()) 
+                        {
+                            rb.status(422, "The Keys parameter must be a comma separated list").sendWithEOM();
+                            return;
+                        }
+
+                        auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
+                        decltype(first_key) end_key_split{};
+
+                        folly::dynamic out = folly::dynamic::object;
+                        for(auto it = first_key; it != end_key_split; it++)
+                        {
+                            std::string key{it->begin(), it->end()};
+                            out[key] = summary(key);
+                        }
+
+                        rb.body(folly::toJson(out))
+                          .status(200, "OK")
+                          .sendWithEOM();
+                    }
+                    else
+                    {
+                        rb.status(422, "Missing keys parameter").sendWithEOM();
+                    }
+                }
+
 
                 void on_diff(proxygen::HTTPMessage& headers) 
                 {
@@ -124,6 +161,7 @@ namespace henhouse
 
                 void on_values(proxygen::HTTPMessage& headers)
                 {
+                    using boost::lexical_cast;
                     auto rb = proxygen::ResponseBuilder{downstream_};
 
                     if(headers.hasQueryParam("keys"))
@@ -138,43 +176,43 @@ namespace henhouse
                         }
 
                         auto a = headers.hasQueryParam("a") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
+                            lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
                             0;
 
                         auto b = headers.hasQueryParam("b") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
+                            lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
                             std::time(0);
 
                         if(a > b) std::swap(a, b);
 
                         auto step = headers.hasQueryParam("step") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("step")) :
+                            lexical_cast<std::uint64_t>(headers.getQueryParam("step")) :
                             1;
 
                         auto segment_size = headers.hasQueryParam("size") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("size")) :
+                            lexical_cast<std::uint64_t>(headers.getQueryParam("size")) :
                             step;
 
                         auto extract_func = headers.hasQueryParam("sum") ? 
-                            [](const hdb::diff_result& r) { return r.sum;}:
+                            [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.sum);}:
                             (headers.hasQueryParam("variance") ?  
-                             [](const hdb::diff_result& r) { return r.variance;} : 
-                             [](const hdb::diff_result& r) { return r.mean;});
+                             [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.variance);} : 
+                             [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.mean);});
 
                         bool is_csv = headers.hasQueryParam("csv");
 
                         auto render_func = !is_csv && headers.hasQueryParam("xy") ? 
-                            [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
+                            [](proxygen::ResponseBuilder& rb, hdb::time_type t, const std::string& v) -> void 
                             {
                                 rb.body("{\"x\":");
-                                rb.body(boost::lexical_cast<std::string>(t));
+                                rb.body(lexical_cast<std::string>(t));
                                 rb.body(",\"y\":");
-                                rb.body(boost::lexical_cast<std::string>(v));
+                                rb.body(v);
                                 rb.body("}");
                             } :
-                        [](proxygen::ResponseBuilder& rb, hdb::time_type t, hdb::count_type v) -> void 
+                        [](proxygen::ResponseBuilder& rb, hdb::time_type t, const std::string& v) -> void 
                         {
-                            rb.body(boost::lexical_cast<std::string>(v));
+                            rb.body(v);
                         };
 
 
@@ -214,6 +252,7 @@ namespace henhouse
                         hdb::time_type a, 
                         hdb::time_type b)
                 {
+                    REQUIRE(!key.empty());
                     REQUIRE_GREATER_EQUAL(b, a);
 
                     auto r = _db.diff(key, a, b, NO_OFFSET);
@@ -222,6 +261,21 @@ namespace henhouse
                         ("mean", r.mean)
                         ("variance", r.variance)
                         ("change", r.change)
+                        ("points", r.size);
+                    return o;
+                }
+
+                folly::dynamic summary(const std::string& key)
+                {
+                    REQUIRE(!key.empty());
+
+                    auto r = _db.summary(key);
+                    folly::dynamic o = folly::dynamic::object
+                        ("from", r.from)
+                        ("to", r.to)
+                        ("sum", r.sum)
+                        ("mean", r.mean)
+                        ("variance", r.variance)
                         ("points", r.size);
                     return o;
                 }

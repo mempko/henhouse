@@ -19,6 +19,7 @@ namespace henhouse
 
             public:
 
+                summary_result summary(const std::string& key) const;
                 get_result get(const std::string& key, time_type t) const;
                 bool put(const std::string& key, time_type t, count_type c);
                 diff_result diff(const std::string& key, time_type a, time_type b, const offset_type index_offset) const;

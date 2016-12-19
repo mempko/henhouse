@@ -42,9 +42,9 @@ namespace henhouse
 
             const auto sum = b.integral - a.integral;
             const auto second_sum = b.second_integral - a.second_integral;
-            const auto mean = sum / n;
+            const auto mean = static_cast<mean_type>(sum) / n;
             const auto mean_squared = mean * mean;
-            const auto second_mean = second_sum / n;
+            const auto second_mean = static_cast<mean_type>(second_sum) / n;
             const auto variance = second_mean - mean_squared;
             const change_type change = b.value > a.value ? (b.value - a.value) : -(a.value - b.value);
 
@@ -128,6 +128,44 @@ namespace henhouse
             return true;
         }
 
+        summary_result timeline::summary() const  
+        {
+            if(index.empty()) return summary_result{0,0,0,0,0,0};
+            REQUIRE(!data.empty());
+
+            const auto front = index.front();
+            const auto back = index.back();
+
+            //time of first bucket
+            const auto from = front.time;
+
+            //compute time of last bucket
+            const auto resolution = index.meta().resolution;
+            CHECK_GREATER(data.size(), back.pos);
+            auto last_buckets = data.size() - back.pos;
+            auto to = back.time + (last_buckets * resolution);
+
+            CHECK_GREATER(to, from);
+
+            count_type n = (to - from) /  resolution;
+
+            //if we have one bucket then first is empty data item
+            auto first_bucket = data_item{0,0,0};
+            auto last_bucket = data.back();
+
+            //diff the two buckets
+            auto diff = diff_buckets(0, first_bucket, last_bucket, n);
+            return summary_result 
+            {
+                from,
+                to,
+                diff.sum, 
+                diff.mean, 
+                diff.variance,
+                n
+            };
+        }
+
         void clamp(pos_result& r, std::size_t size)
         {
             REQUIRE_LESS(r.pos, size);
@@ -140,6 +178,7 @@ namespace henhouse
             ENSURE_RANGE(r.pos + r.offset, 0, size);
         }
 
+
         get_result timeline::get_a(time_type t, const offset_type index_offset) const  
         {
             auto p = index.find_pos(t, index_offset);
@@ -151,7 +190,7 @@ namespace henhouse
             return get_result 
             { 
                 p.index_offset,
-                t - index.meta().resolution,
+                t,
                 p.time, 
                 p.pos,
                 p.offset,

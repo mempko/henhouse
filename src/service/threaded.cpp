@@ -62,6 +62,20 @@ namespace henhouse
 
                         }
                         break;
+                    case req_type::summary:
+                        try
+                        {
+                            REQUIRE(r.summary_result);
+                            r.summary_result->set_value(db.summary(r.key));
+                        }
+                        catch(std::exception& e) 
+                        {
+                            CHECK(r.summary_result);
+                            std::cerr << "Error summing data: " << r.key
+                                << ": " << e.what() << std::endl;
+                            r.summary_result->set_value(db::summary_result{});
+                        }
+                        break;
                     default: CHECK(false && "missed case");
                 }
             }
@@ -100,6 +114,19 @@ namespace henhouse
             r.a = t;
             r.count = c;
             _workers[n]->queue().write(std::move(r));
+        }
+
+        db::summary_result server::summary(const std::string& key) const 
+        {
+            auto n = worker_num(key);
+            req r;
+            r.type = req_type::summary;
+            r.key = key;
+            summary_promise p;
+            summary_future f = p.get_future();
+            r.summary_result = &p;
+            _workers[n]->queue().write(std::move(r));
+            return f.get();
         }
 
         db::get_result server::get(const std::string& key, db::time_type t) const 

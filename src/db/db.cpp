@@ -38,6 +38,11 @@ namespace henhouse
             }
         }
 
+        summary_result timeline_db::summary(const std::string& key) const
+        {
+            const auto& tl = get_tl(key);
+            return tl.summary();
+        }
 
         get_result timeline_db::get(const std::string& key, time_type t) const 
         {

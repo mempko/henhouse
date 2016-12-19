@@ -17,6 +17,10 @@ namespace henhouse
         using change_type = std::int64_t;
         using offset_type = std::uint64_t;
 
+        //TODO, use rational numbers instead in the future.
+        using mean_type = double;
+        using variance_type = double;
+
         struct index_item
         {
             time_type time = 0;
@@ -107,7 +111,7 @@ namespace henhouse
 
                 pos_result find_pos(time_type t, const offset_type offset) const
                 {
-                    if(size() == 0) return pos_result {0, t, 0, 0, true};
+                    if(empty()) return pos_result {0, t, 0, 0, true};
                     const auto range = find_range(t, offset);
                     if(range == nullptr) return pos_result{0, front().time, 0, 0, true};
 
@@ -118,6 +122,16 @@ namespace henhouse
         using key_t = std::string;
 
         using data_type = util::mapped_vector<data_metadata, data_item>;
+
+        struct summary_result
+        {
+            time_type from;
+            time_type to;
+            count_type sum;
+            mean_type mean;
+            variance_type variance;
+            count_type size;
+        };
 
         struct get_result
         {
@@ -133,8 +147,8 @@ namespace henhouse
         {
             offset_type index_offset;
             count_type sum;
-            count_type mean;
-            count_type variance;
+            mean_type mean;
+            variance_type variance;
             change_type change;
             count_type size;
         };
@@ -146,6 +160,8 @@ namespace henhouse
             data_type data;
 
             bool put(time_type t, count_type c);
+
+            summary_result summary() const;  
 
             //get_a returns the value at the bucket before time t bucket.
             get_result get_a(time_type t, const offset_type index_offset) const;  
