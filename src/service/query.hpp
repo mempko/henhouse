@@ -215,7 +215,6 @@ namespace henhouse
                             rb.body(v);
                         };
 
-
                         render_values(rb, keys, a, b, step, segment_size, render_func, extract_func, is_csv);
 
                         rb.status(200, "OK").sendWithEOM();
@@ -261,7 +260,8 @@ namespace henhouse
                         ("mean", r.mean)
                         ("variance", r.variance)
                         ("change", r.change)
-                        ("points", r.size);
+                        ("points", r.size)
+                        ("resolution", r.resolution);
                     return o;
                 }
 
@@ -273,6 +273,7 @@ namespace henhouse
                     folly::dynamic o = folly::dynamic::object
                         ("from", r.from)
                         ("to", r.to)
+                        ("resolution", r.resolution)
                         ("sum", r.sum)
                         ("mean", r.mean)
                         ("variance", r.variance)
@@ -354,6 +355,13 @@ namespace henhouse
                         for(; a <= e; s+=step, a+=step) 
                         {
                             const auto r = _db.diff(key, s, a, prev_index_offset);
+                            if(segment_size < r.resolution) 
+                            {
+                                std::stringstream e;
+                                e << "the segment size " << segment_size << " is too small for the key \"" << key << "\" , must be bigger than " << r.resolution;
+                                throw std::runtime_error{e.str()};
+                            }
+
                             prev_index_offset = r.index_offset;
                             render_value(rb, a, extract_value(r));
                             rb.body(",");

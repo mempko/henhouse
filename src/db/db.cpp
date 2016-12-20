@@ -84,7 +84,7 @@ namespace henhouse
 
             if(!bf::exists(key_dir)) bf::create_directories(key_dir);
 
-            _tls.set(clean_key, from_directory(key_dir.string()));
+            _tls.set(clean_key, from_directory(key_dir.string(), _new_tl_resolution));
             auto p = _tls.find(clean_key);
             return p->second;
         }
@@ -99,7 +99,7 @@ namespace henhouse
 
             if(!bf::exists(key_dir)) bf::create_directories(key_dir);
 
-            _tls.set(clean_key, from_directory(key_dir.string()));
+            _tls.set(clean_key, from_directory(key_dir.string(), _new_tl_resolution));
             auto p = _tls.find(clean_key);
             return p->second;
         }

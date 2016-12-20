@@ -11,12 +11,22 @@ namespace henhouse
     {
         const offset_type ADD_BUCKET_BACK_LIMIT = 60;
 
+        /**
+         * This is the main function to compute the partial sums given previous bucket.
+         * It turns the current non-summed bucket into a summed bucket.
+         *
+         * current.value is assumed to be set to the count in that bucket.
+         *
+         * It computes partial sum(X) and partial sum(X^2) up the current bucket.
+         */
         void propogate(data_item prev, data_item& current)
         {
             current.integral = prev.integral + current.value;
             current.second_integral = prev.second_integral + (current.value * current.value);
         }
 
+        //Adds a count c to the current bucket and updates the partial sum
+        //values of the current bucket. 
         void update_current(data_item prev, data_item& current, count_type c)
         {
             current.value += c;
@@ -36,8 +46,9 @@ namespace henhouse
          *          = (mean of squared x) - mean^2
          *          = (mean of squared x) - (mean squared)
          */
-        diff_result diff_buckets(const offset_type index_offset, data_item a, data_item b, count_type n)
+        diff_result diff_buckets(const time_type resolution, const offset_type index_offset, const data_item a, const data_item b, const count_type n)
         {
+            REQUIRE_GREATER(resolution, 0);
             REQUIRE_GREATER(n, 0);
 
             const auto sum = b.integral - a.integral;
@@ -50,6 +61,7 @@ namespace henhouse
 
             return diff_result 
             { 
+                resolution,
                 index_offset,
                 sum, 
                 mean, 
@@ -105,6 +117,8 @@ namespace henhouse
 
                         //index position
                         const auto resolution = index.meta().resolution;
+                        CHECK_GREATER(resolution, 0);
+
                         const auto aliased_time = p.time + (p.offset * resolution);
                         index_item index_entry = {aliased_time, new_pos};
 
@@ -130,7 +144,10 @@ namespace henhouse
 
         summary_result timeline::summary() const  
         {
-            if(index.empty()) return summary_result{0,0,0,0,0,0};
+            const auto resolution = index.meta().resolution;
+            CHECK_GREATER(resolution, 0);
+
+            if(index.empty()) return summary_result{0,0,resolution, 0,0,0,0};
             REQUIRE(!data.empty());
 
             const auto front = index.front();
@@ -140,7 +157,6 @@ namespace henhouse
             const auto from = front.time;
 
             //compute time of last bucket
-            const auto resolution = index.meta().resolution;
             CHECK_GREATER(data.size(), back.pos);
             auto last_buckets = data.size() - back.pos;
             auto to = back.time + (last_buckets * resolution);
@@ -154,11 +170,12 @@ namespace henhouse
             auto last_bucket = data.back();
 
             //diff the two buckets
-            auto diff = diff_buckets(0, first_bucket, last_bucket, n);
+            auto diff = diff_buckets(resolution, 0, first_bucket, last_bucket, n);
             return summary_result 
             {
                 from,
                 to,
+                resolution,
                 diff.sum, 
                 diff.mean, 
                 diff.variance,
@@ -226,8 +243,11 @@ namespace henhouse
 
         diff_result timeline::diff(time_type a, time_type b, const offset_type index_offset) const
         {
+            const auto resolution = index.meta().resolution;
+            CHECK_GREATER(resolution, 0);
+
             if(a > b) std::swap(a,b);
-            if(data.size() == 0) return diff_result{ 0, 0, 0, 0};
+            if(data.size() == 0) return diff_result{ resolution, 0, 0, 0, 0};
 
             auto ar = get_a(a, index_offset);
             auto br = get_b(b, index_offset);
@@ -235,21 +255,21 @@ namespace henhouse
             b = std::max(br.query_time, br.range_time);
             a = std::min(ar.query_time, b);
 
-            if(a == b) return diff_result{ 0, 0, 0, 0};
-
-            CHECK_GREATER(b, a);
-
-            const auto resolution = index.meta().resolution;
             const auto time_diff = b - a;
-            const auto n = time_diff / resolution;
+            auto n = time_diff / resolution;
+
+            if(n == 0) return diff_result{ resolution, 0, 0, 0, 0};
 
             CHECK_GREATER(n , 0);
             CHECK_LESS_EQUAL(ar.index_offset, br.index_offset);
-            return diff_buckets(ar.index_offset, ar.value, br.value, n);
+            return diff_buckets(resolution, ar.index_offset, ar.value, br.value, n);
         }
 
-        timeline from_directory(const std::string& path) 
+        timeline from_directory(const std::string& path, const time_type resolution) 
         {
+            REQUIRE(!path.empty());
+            REQUIRE_GREATER(resolution, 0);
+
             bf::create_directory(path);
             if(!bf::is_directory(path))
                 throw std::runtime_error{"path " + path + " is not a directory"}; 
@@ -260,7 +280,7 @@ namespace henhouse
             t.key = root.filename().string();
 
             bf::path idx_data = root / "_.i";
-            t.index = std::move(index_type{idx_data});
+            t.index = std::move(index_type{idx_data, resolution});
 
             bf::path cdata = root / "_.d";
             t.data = std::move(data_type{cdata, DATA_SIZE});

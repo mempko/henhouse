@@ -6,8 +6,17 @@ namespace henhouse
     {
         const std::size_t QUEUE_SIZE = 1000;
 
-        worker::worker(const std::string & root, std::size_t queue_size, std::size_t cache_size) : 
-            _db{root, cache_size}, _queue{queue_size}{} 
+        worker::worker(
+                const std::string & root, 
+                const std::size_t queue_size, 
+                const std::size_t cache_size,
+                const db::time_type new_timeline_resolution) : 
+            _db{root, cache_size, new_timeline_resolution}, _queue{queue_size}
+        {
+            REQUIRE_GREATER(queue_size, 0);
+            REQUIRE_GREATER(cache_size, 0);
+            REQUIRE_GREATER(new_timeline_resolution, 0);
+        }
 
         void req_thread(worker_ptr w) 
         {
@@ -83,25 +92,28 @@ namespace henhouse
         }
 
         server::server(
-                std::size_t workers, 
+                const std::size_t total_workers, 
                 const std::string& root, 
-                std::size_t queue_size,
-                std::size_t cache_size) : _root{root} 
+                const std::size_t queue_size,
+                const std::size_t cache_size,
+                const db::time_type new_timeline_resolution) : _root{root} 
         {
-            REQUIRE_GREATER(workers, 0);
+            REQUIRE_GREATER(total_workers, 0);
             REQUIRE_GREATER(queue_size, 0);
             REQUIRE_GREATER(cache_size, 0);
+            REQUIRE_GREATER(new_timeline_resolution, 0);
+
+            auto workers = total_workers;
 
             while(--workers)
             {
 
-                auto w = std::make_shared<worker>(_root, queue_size, cache_size);
+                auto w = std::make_shared<worker>(_root, queue_size, cache_size, new_timeline_resolution);
                 _workers.emplace_back(w);
 
                 auto t = std::make_shared<std::thread>(req_thread, w);
                 _threads.emplace_back(t);
             }
-
         }
 
         void server::put(const std::string& key, db::time_type t, db::count_type c)

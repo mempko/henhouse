@@ -46,7 +46,6 @@ namespace henhouse
         };
 
         const std::size_t DATA_SIZE = util::PAGE_SIZE;
-        const time_type DEFAULT_RESOLUTION = 5; //seconds
         const std::size_t INDEX_SIZE = util::PAGE_SIZE;
         const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
@@ -63,12 +62,13 @@ namespace henhouse
         {
             public:
                 index_type() : util::mapped_vector<index_metadata, index_item>{} {};
-                index_type(const bf::path& data_file) :
+                index_type(const bf::path& data_file, const time_type resolution) :
                     util::mapped_vector<index_metadata, index_item>{data_file, INDEX_SIZE}
                 {
+                    REQUIRE_GREATER(resolution, 0);
                     INVARIANT(_metadata);
 
-                    if(_metadata->resolution == 0) _metadata->resolution = DEFAULT_RESOLUTION;
+                    if(_metadata->resolution == 0) _metadata->resolution = resolution;
                 }
 
                 const index_item* find_range(time_type t, const offset_type offset) const 
@@ -127,6 +127,7 @@ namespace henhouse
         {
             time_type from;
             time_type to;
+            time_type resolution;
             count_type sum;
             mean_type mean;
             variance_type variance;
@@ -145,6 +146,7 @@ namespace henhouse
 
         struct diff_result
         {
+            time_type resolution;
             offset_type index_offset;
             count_type sum;
             mean_type mean;
@@ -171,7 +173,7 @@ namespace henhouse
             diff_result diff(time_type a, time_type b, const offset_type index_offset) const;
         };
 
-        timeline from_directory(const std::string& path);
+        timeline from_directory(const std::string& path, const time_type resolution);
     }
 }
 #endif

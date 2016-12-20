@@ -14,8 +14,13 @@ namespace henhouse
         class timeline_db 
         {
             public:
-                timeline_db(const std::string& root, std::size_t cache_size) : 
-                    _root{root}, _tls{cache_size} {} 
+                timeline_db(const std::string& root, const std::size_t cache_size, const time_type new_timeline_resolution) : 
+                    _root{root}, _new_tl_resolution{new_timeline_resolution}, _tls{cache_size} 
+                {
+                    REQUIRE(!root.empty());
+                    REQUIRE_GREATER(cache_size, 0);
+                    REQUIRE_GREATER(new_timeline_resolution, 0);
+                }
 
             public:
 
@@ -33,6 +38,7 @@ namespace henhouse
 
             private:
                 bf::path _root;
+                time_type _new_tl_resolution;
                 mutable timeline_cache _tls;
         };
     }
