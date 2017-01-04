@@ -1,5 +1,4 @@
-Henhouse
-========================
+#Henhouse
 
 Henhouse is a fast time series DB that can compute sum, average, and variance 
 between any two time ranges in **basically** constant time. 
@@ -12,8 +11,7 @@ streaming versions of computing mean and variance.
 
 ![alt text](doc/graph.png "Time Graph")
 
-Design
-=========================
+#Design
 
 There is an index and time data for each "key". The key, index and data together make a 
 timeline. Timelines are broken up as continuous frames of time ranges with buckets at a given 
@@ -25,8 +23,7 @@ Given two buckets, you can compute sum, average, and variance in constant time.
 The index and data structures store the data using memory mapped files
 for optimal performance.
 
-Complexity Analysis
-==========================
+#Complexity Analysis
 
 Finding a time range inside the index is O(log(n)) because binary search is used
 for finding the index entry. 
@@ -42,8 +39,7 @@ Inserting an entry to the DB is constant time since only inserts into the last
 time range are allowed within a fixed time interval. This restriction is designed to 
 maintain constant time inserts into the DB.
 
-Building
-==========================
+#Building
 
 Download Dependencies.
 
@@ -60,4 +56,12 @@ run...
     make -j
     ./src/henhouse/henhouse
 
+
+#Directories
+
+| Directories                            | Description                                                                                                  |
+|:---------------------------------------|:-------------------------------------------------------------------------------------------------------------|
+| [src](src)                             | Henhouse Source|
+| [tests](tests)                         | Tests to Hammer Henhouse with Good and Bad Queries |
+| [tools](tests)                         | Misc Tools to work with Henhouse |
 
