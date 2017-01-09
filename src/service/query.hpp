@@ -97,11 +97,14 @@ namespace henhouse
                         auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
                         decltype(first_key) end_key_split{};
 
-                        folly::dynamic out = folly::dynamic::object;
+                        folly::dynamic out = folly::dynamic::array();
                         for(auto it = first_key; it != end_key_split; it++)
                         {
                             std::string key{it->begin(), it->end()};
-                            out[key] = summary(key);
+                            folly::dynamic s = folly::dynamic::object
+                                ("key", key)
+                                ("stats", summary(key));
+                            out.push_back(std::move(s));
                         }
 
                         rb.body(folly::toJson(out))
@@ -142,11 +145,14 @@ namespace henhouse
                         auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
                         decltype(first_key) end_key_split{};
 
-                        folly::dynamic out = folly::dynamic::object;
+                        folly::dynamic out = folly::dynamic::array();
                         for(auto it = first_key; it != end_key_split; it++)
                         {
                             std::string key{it->begin(), it->end()};
-                            out[key] = diff(key, a, b);
+                            folly::dynamic s = folly::dynamic::object
+                                ("key", key)
+                                ("stats", diff(key, a, b));
+                            out.push_back(std::move(s));
                         }
 
                         rb.body(folly::toJson(out))
