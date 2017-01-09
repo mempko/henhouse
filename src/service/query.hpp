@@ -33,17 +33,36 @@ namespace henhouse
 {
     namespace net
     {
-        const std::size_t MAX_QUERY_SIZE = 10000;
-        const std::string QUERY_TOO_LARGE = 
-            "query size is too large. Max query must be under 10000 values";
 
-        const std::string SMALL_PRECISION_STEP_ERROR  = 
-            "cannot go beyond second precision, for step";
+        namespace
+        {
+            const std::size_t MAX_QUERY_SIZE = 10000;
+            const std::string QUERY_TOO_LARGE = 
+                "query size is too large. Max query must be under 10000 values";
 
-        const std::string SMALL_PRECISION_SIZE_ERROR  = 
-            "cannot go beyond second precision, for segment size";
+            const std::string SMALL_PRECISION_STEP_ERROR  = 
+                "cannot go beyond second precision, for step";
 
-        const db::offset_type NO_OFFSET = 0;
+            const std::string SMALL_PRECISION_SIZE_ERROR  = 
+                "cannot go beyond second precision, for segment size";
+
+            const db::offset_type NO_OFFSET = 0;
+
+            template<class key_func>
+                void for_each_key(const std::string &keys, key_func kf)
+                {
+                    auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
+                    decltype(first_key) end_key_split{};
+
+                    for(auto it = first_key; it != end_key_split; it++)
+                    {
+                        std::string key{it->begin(), it->end()};
+                        if(key.empty()) continue;
+
+                        kf(key, it == first_key);
+                    }
+                }
+        }
 
         class query_request_handler : public proxygen::RequestHandler {
             public:
@@ -94,18 +113,15 @@ namespace henhouse
                             return;
                         }
 
-                        auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
-                        decltype(first_key) end_key_split{};
-
                         folly::dynamic out = folly::dynamic::array();
-                        for(auto it = first_key; it != end_key_split; it++)
+
+                        for_each_key(keys, [&](const std::string & key, bool) 
                         {
-                            std::string key{it->begin(), it->end()};
                             folly::dynamic s = folly::dynamic::object
-                                ("key", key)
-                                ("stats", summary(key));
+                            ("key", key)
+                            ("stats", summary(key));
                             out.push_back(std::move(s));
-                        }
+                        });
 
                         rb.body(folly::toJson(out))
                           .status(200, "OK")
@@ -142,18 +158,15 @@ namespace henhouse
 
                         if(a > b) std::swap(a, b);
 
-                        auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
-                        decltype(first_key) end_key_split{};
-
                         folly::dynamic out = folly::dynamic::array();
-                        for(auto it = first_key; it != end_key_split; it++)
+
+                        for_each_key(keys, [&](const std::string & key, bool) 
                         {
-                            std::string key{it->begin(), it->end()};
                             folly::dynamic s = folly::dynamic::object
                                 ("key", key)
                                 ("stats", diff(key, a, b));
                             out.push_back(std::move(s));
-                        }
+                        });
 
                         rb.body(folly::toJson(out))
                           .status(200, "OK")
@@ -299,34 +312,28 @@ namespace henhouse
                             extract_func extract_value,
                             bool is_csv)
                 {
-                        auto first_key = ba::make_split_iterator(keys, ba::first_finder(",", ba::is_equal()));
-                        decltype(first_key) end_key_split{};
-
                         if(is_csv) 
                         {
-                            for(auto it = first_key; it != end_key_split; it++)
+                            for_each_key(keys, [&](const std::string& key, bool) 
                             {
-                                std::string key{it->begin(), it->end()};
                                 rb.body(",");
                                 render_key_values(rb, key, a, b, step, segment_size, render_value, extract_value);
                                 rb.body("\n");
-                            }
-
+                            });
                         }
                         else
                         {
                             rb.body("{");
-                            for(auto it = first_key; it != end_key_split; it++)
+                            for_each_key(keys, [&](const std::string& key, bool is_first) 
                             {
-                                if(it != first_key) rb.body(",");
-                                std::string key{it->begin(), it->end()};
+                                if(!is_first) rb.body(",");
                                 rb.body("\"");
                                 rb.body(key);
                                 rb.body("\":");
                                 rb.body("[");
                                 render_key_values(rb, key, a, b, step, segment_size, render_value, extract_value);
                                 rb.body("]");
-                            }
+                            });
                             rb.body("}");
                         }
 
