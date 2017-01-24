@@ -368,7 +368,7 @@ namespace henhouse
                         if(segment_size < 1) throw bad_request( SMALL_PRECISION_SIZE_ERROR );
 
                         a = std::max(segment_size, a);
-                        b = std::max(step, a);
+                        b = std::max(step, b);
 
                         //output all but last
                         auto s = a - segment_size;
