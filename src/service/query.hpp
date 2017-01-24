@@ -62,7 +62,13 @@ namespace henhouse
                         kf(key, it == first_key);
                     }
                 }
+
+            struct bad_request : public std::runtime_error 
+            {
+                bad_request(const std::string& error) : std::runtime_error{error}{}
+            };
         }
+
 
         class query_request_handler : public proxygen::RequestHandler {
             public:
@@ -85,6 +91,12 @@ namespace henhouse
                             .sendWithEOM();
                     }
 
+                }
+                catch(bad_request& e)
+                {
+                    proxygen::ResponseBuilder{downstream_}
+                        .status(400, e.what())
+                        .sendWithEOM();
                 }
                 catch(std::exception& e)
                 {
@@ -109,7 +121,7 @@ namespace henhouse
 
                         if(keys.empty()) 
                         {
-                            rb.status(422, "The Keys parameter must be a comma separated list").sendWithEOM();
+                            rb.status(400, "The Keys parameter must be a comma separated list").sendWithEOM();
                             return;
                         }
 
@@ -129,7 +141,7 @@ namespace henhouse
                     }
                     else
                     {
-                        rb.status(422, "Missing keys parameter").sendWithEOM();
+                        rb.status(400, "Missing keys parameter").sendWithEOM();
                     }
                 }
 
@@ -144,7 +156,7 @@ namespace henhouse
 
                         if(keys.empty()) 
                         {
-                            rb.status(422, "The Keys parameter must be a comma separated list").sendWithEOM();
+                            rb.status(400, "The Keys parameter must be a comma separated list").sendWithEOM();
                             return;
                         }
 
@@ -174,7 +186,7 @@ namespace henhouse
                     }
                     else
                     {
-                        rb.status(422, "Missing keys parameter").sendWithEOM();
+                        rb.status(400, "Missing keys parameter").sendWithEOM();
                     }
                 }
 
@@ -190,7 +202,7 @@ namespace henhouse
 
                         if(keys.empty()) 
                         {
-                            rb.status(422, "The Keys parameter must be a comma separated list").sendWithEOM();
+                            rb.status(400, "The Keys parameter must be a comma separated list").sendWithEOM();
                             return;
                         }
 
@@ -240,7 +252,7 @@ namespace henhouse
                     }
                     else
                     {
-                        rb.status(422, "Missing keys parameter").sendWithEOM();
+                        rb.status(400, "Missing keys parameter").sendWithEOM();
                     }
                 }
 
@@ -352,15 +364,18 @@ namespace henhouse
                     {
                         REQUIRE_GREATER_EQUAL(b, a);
 
-                        if(step < 1) throw std::runtime_error{SMALL_PRECISION_STEP_ERROR};
-                        if(segment_size < 1) throw std::runtime_error{SMALL_PRECISION_SIZE_ERROR};
+                        if(step < 1) throw bad_request( SMALL_PRECISION_STEP_ERROR );
+                        if(segment_size < 1) throw bad_request( SMALL_PRECISION_SIZE_ERROR );
+
+                        a = std::max(segment_size, a);
+                        b = std::max(step, a);
 
                         //output all but last
                         auto s = a - segment_size;
                         const auto e = b - step;
 
-                        const auto query_size = (e - a) / step;
-                        if(query_size > MAX_QUERY_SIZE) throw std::runtime_error{QUERY_TOO_LARGE};
+                        const auto query_size = (b - a) / step;
+                        if(query_size > MAX_QUERY_SIZE) throw bad_request( QUERY_TOO_LARGE );
 
                         auto prev_index_offset = 0;
 
@@ -372,7 +387,7 @@ namespace henhouse
                             {
                                 std::stringstream e;
                                 e << "the segment size " << segment_size << " is too small for the key \"" << key << "\" , must be bigger than " << r.resolution;
-                                throw std::runtime_error{e.str()};
+                                throw bad_request( e.str() );
                             }
 
                             prev_index_offset = r.index_offset;
