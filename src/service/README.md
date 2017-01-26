@@ -58,9 +58,9 @@ Each attribute key has the following attributes returned.
 | sum                         |  Sum of all values in the timeline|
 | mean                        |  Mean of all values in the timeline|
 | variance                    |  Variance of all values in the timeline|
-| change                      |  Change from beginning to end of the time range|
 | points                      |  Total amount of data points in the timeline|
 | resolution                  |  Resolution of timeline in seconds|
+| left,right                  |  left and right bucket {"val": .., "agg": ..} where val is the value in that bucket and agg is sum of values up to that point.|
 
 ##/values
 
@@ -75,7 +75,7 @@ The diff endpoint allows you to query a timeline between two time ranges
 | step                        |  size of step to take in seconds from beginning to end of the time range |
 | size                        |  size of each step. The step size can be larger then the step, providing ability to compute a moving average|
 | csv                         |  If this argument exists the data is returned in CSV format instead of JSON|
-| sum\|variance\|mean         |  If specified then the sum, mean, or variance is returned. Default returns the mean|
+| sum\|var\|mean\|agg         |  If specified then the sum, mean, ,variance, and aggregate is returned. Default returns the sum|
 | xy                          |  If specified then each point is specified as a json object with x and y attributes, Default is to return an array of numbers|
 
 ###response

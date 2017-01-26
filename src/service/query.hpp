@@ -75,15 +75,15 @@ namespace henhouse
                 explicit query_request_handler(threaded::server& db, const std::size_t max_values) : 
                     RequestHandler{}, _db{db}, _max_values{max_values} {}
 
-                void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override
+                void onRequest(std::unique_ptr<proxygen::HTTPMessage> req) noexcept override
                 try
                 {
-                    if(headers->getPath() == "/summary") 
-                        on_summary(*headers);
-                    else if(headers->getPath() == "/diff") 
-                        on_diff(*headers);
-                    else if(headers->getPath() == "/values") 
-                        on_values(*headers);
+                    if(req->getPath() == "/summary") 
+                        on_summary(*req);
+                    else if(req->getPath() == "/diff") 
+                        on_diff(*req);
+                    else if(req->getPath() == "/values") 
+                        on_values(*req);
                     else
                     {
                         proxygen::ResponseBuilder{downstream_}
@@ -111,13 +111,15 @@ namespace henhouse
                         .sendWithEOM();
                 }
 
-                void on_summary(proxygen::HTTPMessage& headers) 
+            private:
+
+                void on_summary(proxygen::HTTPMessage& req) 
                 {
                     auto rb = proxygen::ResponseBuilder{downstream_};
 
-                    if(headers.hasQueryParam("keys"))
+                    if(req.hasQueryParam("keys"))
                     {
-                        auto keys = headers.getQueryParam("keys");
+                        auto keys = req.getQueryParam("keys");
 
                         if(keys.empty()) 
                         {
@@ -146,13 +148,14 @@ namespace henhouse
                 }
 
 
-                void on_diff(proxygen::HTTPMessage& headers) 
+                void on_diff(proxygen::HTTPMessage& req) 
                 {
+                    using boost::lexical_cast;
                     auto rb = proxygen::ResponseBuilder{downstream_};
 
-                    if(headers.hasQueryParam("keys"))
+                    if(req.hasQueryParam("keys"))
                     {
-                        auto keys = headers.getQueryParam("keys");
+                        auto keys = req.getQueryParam("keys");
 
                         if(keys.empty()) 
                         {
@@ -160,12 +163,12 @@ namespace henhouse
                             return;
                         }
 
-                        auto a = headers.hasQueryParam("a") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
+                        auto a = req.hasQueryParam("a") ? 
+                            lexical_cast<std::uint64_t>(req.getQueryParam("a")) :
                             0;
 
-                        auto b = headers.hasQueryParam("b") ? 
-                            boost::lexical_cast<std::uint64_t>(headers.getQueryParam("b")) : 
+                        auto b = req.hasQueryParam("b") ? 
+                            lexical_cast<std::uint64_t>(req.getQueryParam("b")) : 
                             std::time(0);
 
                         if(a > b) std::swap(a, b);
@@ -190,15 +193,30 @@ namespace henhouse
                     }
                 }
 
-                void on_values(proxygen::HTTPMessage& headers)
+                using extract_func_t = std::function<std::string(const hdb::diff_result& r)>;
+                extract_func_t get_extract_func(proxygen::HTTPMessage& req)
+                {
+                    using boost::lexical_cast;
+                    extract_func_t f = [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.sum);};
+                    if(req.hasQueryParam("mean")) 
+                        f = [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.mean);};
+                    else if(req.hasQueryParam("var"))
+                        f = [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.variance);}; 
+                    else if(req.hasQueryParam("agg"))
+                        f = [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.right.integral);};
+
+                    return f;
+                }
+
+                void on_values(proxygen::HTTPMessage& req)
                 {
                     using boost::lexical_cast;
                     auto rb = proxygen::ResponseBuilder{downstream_};
 
-                    if(headers.hasQueryParam("keys"))
+                    if(req.hasQueryParam("keys"))
                     {
 
-                        auto keys = headers.getQueryParam("keys");
+                        auto keys = req.getQueryParam("keys");
 
                         if(keys.empty()) 
                         {
@@ -206,33 +224,29 @@ namespace henhouse
                             return;
                         }
 
-                        auto a = headers.hasQueryParam("a") ? 
-                            lexical_cast<std::uint64_t>(headers.getQueryParam("a")) :
+                        auto a = req.hasQueryParam("a") ? 
+                            lexical_cast<std::uint64_t>(req.getQueryParam("a")) :
                             0;
 
-                        auto b = headers.hasQueryParam("b") ? 
-                            lexical_cast<std::uint64_t>(headers.getQueryParam("b")) :
+                        auto b = req.hasQueryParam("b") ? 
+                            lexical_cast<std::uint64_t>(req.getQueryParam("b")) :
                             std::time(0);
 
                         if(a > b) std::swap(a, b);
 
-                        auto step = headers.hasQueryParam("step") ? 
-                            lexical_cast<std::uint64_t>(headers.getQueryParam("step")) :
+                        auto step = req.hasQueryParam("step") ? 
+                            lexical_cast<std::uint64_t>(req.getQueryParam("step")) :
                             1;
 
-                        auto segment_size = headers.hasQueryParam("size") ? 
-                            lexical_cast<std::uint64_t>(headers.getQueryParam("size")) :
+                        auto segment_size = req.hasQueryParam("size") ? 
+                            lexical_cast<std::uint64_t>(req.getQueryParam("size")) :
                             step;
 
-                        auto extract_func = headers.hasQueryParam("sum") ? 
-                            [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.sum);}:
-                            (headers.hasQueryParam("variance") ?  
-                             [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.variance);} : 
-                             [](const hdb::diff_result& r) { return lexical_cast<std::string>(r.mean);});
+                        auto extract_func = get_extract_func(req);
 
-                        bool is_csv = headers.hasQueryParam("csv");
+                        bool is_csv = req.hasQueryParam("csv");
 
-                        auto render_func = !is_csv && headers.hasQueryParam("xy") ? 
+                        auto render_func = !is_csv && req.hasQueryParam("xy") ? 
                             [](proxygen::ResponseBuilder& rb, hdb::time_type t, const std::string& v) -> void 
                             {
                                 rb.body("{\"x\":");
@@ -275,8 +289,6 @@ namespace henhouse
                     delete this;
                 }
 
-            private:
-
                 folly::dynamic diff(
                         const std::string& key, 
                         hdb::time_type a, 
@@ -290,9 +302,16 @@ namespace henhouse
                         ("sum", r.sum)
                         ("mean", r.mean)
                         ("variance", r.variance)
-                        ("change", r.change)
                         ("points", r.size)
-                        ("resolution", r.resolution);
+                        ("resolution", r.resolution)
+                        ("left", 
+                         folly::dynamic::object
+                         ("val", r.left.value)
+                         ("agg", r.left.integral))
+                        ("right", 
+                         folly::dynamic::object
+                         ("val", r.right.value)
+                         ("agg", r.right.integral));
                     return o;
                 }
 

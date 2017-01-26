@@ -51,13 +51,13 @@ namespace henhouse
             REQUIRE_GREATER(resolution, 0);
             REQUIRE_GREATER(n, 0);
 
+            //Sum here is the values added within 
             const auto sum = b.integral - a.integral;
             const auto second_sum = b.second_integral - a.second_integral;
             const auto mean = static_cast<mean_type>(sum) / n;
             const auto mean_squared = mean * mean;
             const auto second_mean = static_cast<mean_type>(second_sum) / n;
             const auto variance = second_mean - mean_squared;
-            const change_type change = b.value > a.value ? (b.value - a.value) : -(a.value - b.value);
 
             return diff_result 
             { 
@@ -66,8 +66,9 @@ namespace henhouse
                 sum, 
                 mean, 
                 variance,
-                change,
-                n
+                n,
+                a,
+                b,
             };
         }
 
@@ -247,7 +248,7 @@ namespace henhouse
             CHECK_GREATER(resolution, 0);
 
             if(a > b) std::swap(a,b);
-            if(data.size() == 0) return diff_result{ resolution, 0, 0, 0, 0};
+            if(data.size() == 0) return diff_result{ resolution, 0, 0, 0, 0, 0, {0}, {0}};
 
             auto ar = get_a(a, index_offset);
             auto br = get_b(b, index_offset);
@@ -258,7 +259,7 @@ namespace henhouse
             const auto time_diff = b - a;
             auto n = time_diff / resolution;
 
-            if(n == 0) return diff_result{ resolution, 0, 0, 0, 0};
+            if(n == 0) return diff_result{ resolution, 0, 0, 0, 0, 0, ar.value, br.value};
 
             CHECK_GREATER(n , 0);
             CHECK_LESS_EQUAL(ar.index_offset, br.index_offset);

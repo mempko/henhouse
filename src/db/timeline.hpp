@@ -14,7 +14,6 @@ namespace henhouse
     {
         using time_type = std::uint64_t;
         using count_type = std::int64_t;
-        using change_type = std::int64_t;
         using offset_type = std::uint64_t;
 
         //TODO, use rational numbers instead in the future.
@@ -146,13 +145,14 @@ namespace henhouse
 
         struct diff_result
         {
-            time_type resolution;
-            offset_type index_offset;
-            count_type sum;
-            mean_type mean;
-            variance_type variance;
-            change_type change;
+            time_type resolution;       //resolution of smallest bucket
+            offset_type index_offset;   //used for faster retrieval of a range of values
+            count_type sum;             //values added within time range
+            mean_type mean;             //mean of values added within time range
+            variance_type variance;     //variance of values added within time range.
             count_type size;
+            data_item left;             //left bucket
+            data_item right;            //right bucket. 
         };
 
         struct timeline
