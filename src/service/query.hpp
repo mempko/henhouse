@@ -415,11 +415,8 @@ namespace henhouse
                         }
 
                         //output last
-                        if(a <= b)
-                        {
-                            const auto r = _db.diff(key, s, a, prev_index_offset);
-                            render_value(rb, a, extract_value(r));
-                        }
+                        const auto r = _db.diff(key, s, b, prev_index_offset);
+                        render_value(rb, b, extract_value(r));
                     }
 
             private:
