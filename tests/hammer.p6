@@ -1,18 +1,30 @@
 use v6;
 use HTTP::Client;
 
-sub MAIN($workers, $a, $z, $error-percent = 0) 
+sub MAIN(Int $workers where {($workers > 1 and $workers %% 2) or $workers == 1}, $a, $z, $error-percent = 0) 
 {
     my @keys = "$a".."$z";
-    my @ps;
 
-    for (1..$workers) -> $w {
-
-        @ps.push: start { put(@keys, $error-percent); };
-        @ps.push: start { get(@keys, $error-percent); };
+    if $workers < 2 
+    {
+        loop 
+        {
+            put(@keys, $error-percent, once=>True);
+            get(@keys, $error-percent, once=>True);
+        }
+    } 
+    else 
+    {
+        my @ps;
+        my $half-workers = $workers / 2;
+        for (1..$half-workers) -> $w 
+        {
+            @ps.push: start { put(@keys, $error-percent); };
+            @ps.push: start { get(@keys, $error-percent); };
+        }
+        await Promise.allof(@ps);
     }
 
-    await Promise.allof(@ps);
 }
 
 sub replace_rand_char($s is rw, @chars) 
@@ -29,12 +41,13 @@ sub corrupt_msg($msg is rw, @chars)
     my $size = $msg.chars;
     my $chars = (1..$size).pick / 10;
 
-    for 0..$chars -> $c {
+    for 0..$chars -> $c 
+    {
         replace_rand_char($msg, @chars);
     }
 }
 
-sub put(@keys, $error-percent)
+sub put(@keys, $error-percent, :$once = False)
 {
     my $s = IO::Socket::INET.new(:host<localhost>, :port<2003>);
     my @letters = "a".."z";
@@ -46,20 +59,24 @@ sub put(@keys, $error-percent)
         my $c = (0..10).pick;
         my $k = @keys.pick;
         my $msg = "{$k} {$c} {DateTime.now.posix}";
-        if (0..100).pick < $error-percent {
+        if (0..100).pick < $error-percent 
+        {
             corrupt_msg($msg, @replacement-chars);
         }
         $s.print("$msg\n");
 
-        CATCH {
-            default {
+        CATCH 
+        {
+            default 
+            {
                 say .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
             }
         }
+        return if $once;
     }
 }
 
-sub get(@keys, $error-percent)
+sub get(@keys, $error-percent, :$once = False)
 {
     my $http = HTTP::Client.new;
     my @letters = "a".."z";
@@ -73,7 +90,8 @@ sub get(@keys, $error-percent)
         my $size = (1..300).pick;
         my $step = (1..300).pick;
         my $args = "values?a=$a&b=$b&keys=$k&step=$step&size=$size&sum";
-        if (0..100).pick < $error-percent {
+        if (0..100).pick < $error-percent 
+        {
             corrupt_msg($args, @replacement-chars);
         }
         my $req = "http://localhost:9999/$args";
@@ -82,10 +100,13 @@ sub get(@keys, $error-percent)
         my $req_time = now - $past;
         say "$req = {$r.status} {$r.content} {$req_time * 1000}ms";
 
-        CATCH {
-            default {
+        CATCH 
+        {
+            default 
+            {
                 say .WHAT.perl, do given .backtrace[0] { .file, .line, .subname }
             }
         }
+        return if $once;
     }
 }
