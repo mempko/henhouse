@@ -50,7 +50,6 @@ sub put(@keys, $error-percent)
             corrupt_msg($msg, @replacement-chars);
         }
         $s.print("$msg\n");
-        sleep 0.01;
 
         CATCH {
             default {
@@ -71,7 +70,9 @@ sub get(@keys, $error-percent)
         my $b = DateTime.now.posix;
         my $a = $b - 120;
         my $k = @keys.pick;
-        my $args = "values?a=$a&b=$b&key=$k&step=5&size=5&sum";
+        my $size = (1..300).pick;
+        my $step = (1..300).pick;
+        my $args = "values?a=$a&b=$b&keys=$k&step=$step&size=$size&sum";
         if (0..100).pick < $error-percent {
             corrupt_msg($args, @replacement-chars);
         }
@@ -79,8 +80,7 @@ sub get(@keys, $error-percent)
         my $past = now;
         my $r = $http.get($req);
         my $req_time = now - $past;
-        say "$req = {$r.status} {$r.content} $req_time";
-        sleep 0.01;
+        say "$req = {$r.status} {$r.content} {$req_time * 1000}ms";
 
         CATCH {
             default {
