@@ -11,6 +11,8 @@ namespace henhouse
     {
         namespace 
         {
+            const int MAX_DIR_LENGTH = 8;
+            const int MAX_DIR_SPLIT_LENGTH = MAX_DIR_LENGTH * 4;
             const offset_type NO_OFFSET = 0;
             std::string sanatize_key(const std::string& key)
             {
@@ -31,10 +33,17 @@ namespace henhouse
             bf::path get_key_dir(const bf::path root, const std::string& key)
             {
                 REQUIRE(!key.empty());
-                if(key.size() <=2)
-                    return root / key;
+                bf::path p = root;
 
-                return root / key.substr(0, 2) / key.substr(2);
+                int i = 0;
+                int s = 0;
+                for(; i < key.size() && i < MAX_DIR_SPLIT_LENGTH; i += MAX_DIR_LENGTH)
+                    p /= key.substr(i, MAX_DIR_LENGTH);
+
+                if(key.size() > MAX_DIR_SPLIT_LENGTH)
+                    p /= key.substr(MAX_DIR_SPLIT_LENGTH, key.size() - MAX_DIR_SPLIT_LENGTH);
+                
+                return p;
             }
         }
 
