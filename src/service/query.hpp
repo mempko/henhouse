@@ -76,14 +76,27 @@ namespace henhouse
                     RequestHandler{}, _db{db}, _max_values{max_values} {}
 
                 void onRequest(std::unique_ptr<proxygen::HTTPMessage> req) noexcept override
+                {
+                    _req = std::move(req);
+                }
+
+                void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override
+                {
+                    if (_body) _body->prependChain(std::move(body));
+                    else _body = std::move(body);
+                }
+
+                void onEOM() noexcept override
                 try
                 {
-                    if(req->getPath() == "/summary") 
-                        on_summary(*req);
-                    else if(req->getPath() == "/diff") 
-                        on_diff(*req);
-                    else if(req->getPath() == "/values") 
-                        on_values(*req);
+                    REQUIRE(_req);
+
+                    if(_req->getPath() == "/summary")
+                        on_summary(*_req);
+                    else if(_req->getPath() == "/diff")
+                        on_diff(*_req);
+                    else if(_req->getPath() == "/values")
+                        on_values(*_req);
                     else
                     {
                         proxygen::ResponseBuilder{downstream_}
@@ -260,9 +273,9 @@ namespace henhouse
                             rb.body(v);
                         };
 
+                        rb.status(200, "OK");
                         render_values(rb, keys, a, b, step, segment_size, render_func, extract_func, is_csv);
-
-                        rb.status(200, "OK").sendWithEOM();
+                        rb.sendWithEOM();
                     }
                     else
                     {
@@ -270,13 +283,6 @@ namespace henhouse
                     }
                 }
 
-                void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override 
-                { 
-                    if (_body) _body->prependChain(std::move(body));
-                    else _body = std::move(body);
-                }
-
-                void onEOM() noexcept override {}
                 void onUpgrade(proxygen::UpgradeProtocol proto) noexcept override {}
 
                 void requestComplete() noexcept override 
@@ -360,8 +366,7 @@ namespace henhouse
                                 if(!is_first) rb.body(",");
                                 rb.body("\"");
                                 rb.body(key);
-                                rb.body("\":");
-                                rb.body("[");
+                                rb.body("\":[");
                                 render_key_values(rb, key, a, b, step, segment_size, render_value, extract_value);
                                 rb.body("]");
                             });
@@ -399,7 +404,9 @@ namespace henhouse
                         auto prev_index_offset = 0;
 
                         //TODO: Create iterator in db that can do this walk.
-                        for(; a <= e; s+=step, a+=step) 
+                        int c = 0;
+
+                        for(; a <= e; s+=step, a+=step, c++)
                         {
                             const auto r = _db.diff(key, s, a, prev_index_offset);
                             if(segment_size < r.resolution) 
@@ -412,6 +419,10 @@ namespace henhouse
                             prev_index_offset = r.index_offset;
                             render_value(rb, a, extract_value(r));
                             rb.body(",");
+
+                            //50 here should roughly be 1k for xy request, though likely larger.
+                            //TODO don't use RequestBuilder, do it yourself.
+                            if(c % 50 == 0) rb.send();
                         }
 
                         //output last
@@ -423,6 +434,7 @@ namespace henhouse
                 threaded::server& _db;
                 const std::size_t _max_values;
                 std::unique_ptr<folly::IOBuf> _body;
+                std::unique_ptr<proxygen::HTTPMessage> _req;
         };
 
         class query_handler_factory : public proxygen::RequestHandlerFactory 
