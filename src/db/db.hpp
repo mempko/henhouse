@@ -4,12 +4,13 @@
 #include "db/timeline.hpp"
 
 #include <folly/EvictingCacheMap.h>
+#include <folly/FBString.h>
 
 namespace henhouse
 {
     namespace db
     {
-        using timeline_cache = folly::EvictingCacheMap<std::string, timeline>;
+        using timeline_cache = folly::EvictingCacheMap<folly::fbstring, timeline>;
 
         class timeline_db 
         {

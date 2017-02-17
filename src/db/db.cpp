@@ -14,9 +14,9 @@ namespace henhouse
             const int MAX_DIR_LENGTH = 8;
             const int MAX_DIR_SPLIT_LENGTH = MAX_DIR_LENGTH * 4;
             const offset_type NO_OFFSET = 0;
-            std::string sanatize_key(const std::string& key)
+            folly::fbstring sanatize_key(const std::string& key)
             {
-                std::string res = key;
+                folly::fbstring res = key;
                 std::replace_if(std::begin(res), std::end(res),
                         [](char c)
                         {
@@ -27,7 +27,7 @@ namespace henhouse
                 return res;
             }
 
-            bf::path get_key_dir(const bf::path root, const std::string& key)
+            bf::path get_key_dir(const bf::path root, const folly::fbstring& key)
             {
                 REQUIRE(!key.empty());
                 bf::path p = root;
@@ -35,10 +35,10 @@ namespace henhouse
                 int i = 0;
                 int s = 0;
                 for(; i < key.size() && i < MAX_DIR_SPLIT_LENGTH; i += MAX_DIR_LENGTH)
-                    p /= key.substr(i, MAX_DIR_LENGTH);
+                    p /= key.substr(i, MAX_DIR_LENGTH).c_str();
 
                 if(key.size() > MAX_DIR_SPLIT_LENGTH)
-                    p /= key.substr(MAX_DIR_SPLIT_LENGTH, key.size() - MAX_DIR_SPLIT_LENGTH);
+                    p /= key.substr(MAX_DIR_SPLIT_LENGTH, key.size() - MAX_DIR_SPLIT_LENGTH).c_str();
                 
                 return p;
             }
