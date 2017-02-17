@@ -45,7 +45,8 @@ namespace henhouse
                 worker(const std::string & root, 
                         const std::size_t queue_size, 
                         const std::size_t cache_size, 
-                        const db::time_type new_timeline_resolution);
+                        const db::time_type new_timeline_resolution,
+                        bool* done);
 
                 req_queue& queue() { return _queue;}
                 const req_queue & queue() const { return _queue;}
@@ -53,9 +54,12 @@ namespace henhouse
                 db::timeline_db& db() { return _db;}
                 const db::timeline_db& db() const { return _db;}
 
+                bool done() const { INVARIANT(_done); return *_done;}
+
             private:
                 req_queue _queue;
 
+                bool* _done;
                 db::timeline_db _db;
         };
 
@@ -73,11 +77,14 @@ namespace henhouse
                         const std::size_t queue_size, 
                         const std::size_t cache_size,
                         const db::time_type new_timeline_resolution);
+                ~server();
 
                 db::summary_result summary(const std::string& key) const; 
                 db::get_result get(const std::string& key, db::time_type t) const; 
                 void put(const std::string& key, db::time_type t, db::count_type c);
                 db::diff_result diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const;
+
+                void stop();
 
             private:
 
@@ -87,6 +94,7 @@ namespace henhouse
                 std::string _root;
                 workers _workers;
                 threads _threads;
+                bool _done;
         };
     }
 }

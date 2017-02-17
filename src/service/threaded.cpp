@@ -10,9 +10,11 @@ namespace henhouse
                 const std::string & root, 
                 const std::size_t queue_size, 
                 const std::size_t cache_size,
-                const db::time_type new_timeline_resolution) : 
-            _db{root, cache_size, new_timeline_resolution}, _queue{queue_size}
+                const db::time_type new_timeline_resolution,
+                bool* done) : 
+            _db{root, cache_size, new_timeline_resolution}, _queue{queue_size}, _done{done}
         {
+            REQUIRE(done);
             REQUIRE_GREATER(queue_size, 0);
             REQUIRE_GREATER(cache_size, 0);
             REQUIRE_GREATER(new_timeline_resolution, 0);
@@ -25,7 +27,7 @@ namespace henhouse
             auto& q = w->queue();
             auto& db = w->db();
 
-            while(true)
+            while(!w->done())
             {
                 req r;
                 q.blockingRead(r);
@@ -96,7 +98,7 @@ namespace henhouse
                 const std::string& root, 
                 const std::size_t queue_size,
                 const std::size_t cache_size,
-                const db::time_type new_timeline_resolution) : _root{root} 
+                const db::time_type new_timeline_resolution) : _root{root}, _done{false} 
         {
             REQUIRE_GREATER(total_workers, 0);
             REQUIRE_GREATER(queue_size, 0);
@@ -108,12 +110,26 @@ namespace henhouse
             while(--workers)
             {
 
-                auto w = std::make_shared<worker>(_root, queue_size, cache_size, new_timeline_resolution);
+                auto w = std::make_shared<worker>(_root, queue_size, cache_size, new_timeline_resolution, &_done);
                 _workers.emplace_back(w);
 
                 auto t = std::make_shared<std::thread>(req_thread, w);
                 _threads.emplace_back(t);
             }
+        }
+
+        server::~server()
+        {
+            stop();
+        }
+
+        void server::stop()
+        {
+            if(_done) return;
+
+            _done = true;
+            for(auto& t : _threads)
+                t->join();
         }
 
         void server::put(const std::string& key, db::time_type t, db::count_type c)
