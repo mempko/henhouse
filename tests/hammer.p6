@@ -47,7 +47,7 @@ sub corrupt_msg($msg is rw, @chars)
     }
 }
 
-sub put(@keys, $error-percent, :$once = False)
+sub put(@keys is copy , $error-percent is copy, :$once = False)
 {
     my $s = IO::Socket::INET.new(:host<localhost>, :port<2003>);
     my @letters = "a".."z";
@@ -76,7 +76,7 @@ sub put(@keys, $error-percent, :$once = False)
     }
 }
 
-sub get(@keys, $error-percent, :$once = False)
+sub get(@keys is copy, $error-percent is copy, :$once = False)
 {
     my $http = HTTP::Client.new;
     my @letters = "a".."z";
