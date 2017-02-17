@@ -16,17 +16,14 @@ namespace henhouse
             const offset_type NO_OFFSET = 0;
             std::string sanatize_key(const std::string& key)
             {
-                std::string res;
-                res.resize(key.size());
-                std::transform(std::begin(key), std::end(key),
-                        std::begin(res),
+                std::string res = key;
+                std::replace_if(std::begin(res), std::end(res),
                         [](char c)
                         {
-                            if((c >= '0' && c <= '9') ||
-                               (c >= 'A' && c <= 'Z') ||
-                               (c >= 'a' && c <= 'z')) return c;
-                            else return '_';
-                        });
+                            return !((c >= '0' && c <= '9') ||
+                                    (c >= 'A' && c <= 'Z') ||
+                                    (c >= 'a' && c <= 'z'));
+                        }, '_');
                 return res;
             }
 
