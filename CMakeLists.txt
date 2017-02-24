@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.11)
 project(henhouse)
 
-add_definitions(-std=c++1y)
+add_definitions(-std=c++17)
 add_definitions(-fPIC)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/)

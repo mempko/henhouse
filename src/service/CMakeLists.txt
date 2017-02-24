@@ -1,4 +1,4 @@
-ADD_DEFINITIONS(-std=c++14)
+add_definitions(-std=c++17)
 
 include_directories(.)
 include_directories(..)

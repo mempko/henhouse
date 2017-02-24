@@ -16,6 +16,7 @@ using folly::SocketAddress;
 using Protocol = proxygen::HTTPServer::Protocol;
 
 namespace po = boost::program_options;
+namespace bf = boost::filesystem;
 
 po::options_description create_descriptions()
 {
@@ -76,7 +77,7 @@ try
     const auto new_timeline_resolution = opt["resolution"].as<henhouse::db::time_type>();
     const auto max_values = opt["max_response_values"].as<std::size_t>();
 
-    boost::filesystem::create_directories(data_dir);
+    bf::create_directories(data_dir);
     henhouse::threaded::server db{db_workers, data_dir, queue_size, cache_size, new_timeline_resolution};
 
     std::cerr << "Started DB" << std::endl;

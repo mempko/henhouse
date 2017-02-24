@@ -7,18 +7,13 @@
 #include <boost/filesystem.hpp>
 
 namespace bio = boost::iostreams;
-namespace bf =  boost::filesystem;
-
-namespace henhouse 
+namespace henhouse::util
 {
-    namespace util 
-    {
-        using mapped_file_ptr = std::shared_ptr<bio::mapped_file>;
+    using mapped_file_ptr = std::shared_ptr<bio::mapped_file>;
 
-        const std::size_t PAGE_SIZE = bio::mapped_file::alignment();
-        const float GROW_FACTOR = 1.5;
+    const std::size_t PAGE_SIZE = bio::mapped_file::alignment();
+    const float GROW_FACTOR = 1.5;
 
-        bool open(bio::mapped_file& file, bf::path path, std::size_t new_size);
-    }
+    bool open(bio::mapped_file& file, boost::filesystem::path path, std::size_t new_size);
 }
 #endif
