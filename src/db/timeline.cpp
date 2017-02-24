@@ -235,14 +235,6 @@ namespace henhouse::db
         };
     }
 
-    template <class T>
-        T within(T v, T a, T b)
-        {
-            v = std::max(a, v);
-            v = std::min(v, b);
-            return v;
-        }
-
     diff_result timeline::diff(time_type a, time_type b, const offset_type index_offset) const
     {
         const auto resolution = index.meta().resolution;
