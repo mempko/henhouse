@@ -129,7 +129,7 @@ namespace henhouse::threaded
             t->join();
     }
 
-    void server::put(const std::string& key, db::time_type t, db::count_type c)
+    void server::put(const stde::string_view& key, db::time_type t, db::count_type c)
     {
         auto n = worker_num(key);
 
@@ -140,7 +140,7 @@ namespace henhouse::threaded
         _workers[n]->queue().write(std::move(r));
     }
 
-    summary_future server::summary(const std::string& key) const 
+    summary_future server::summary(const stde::string_view& key) const 
     {
         auto n = worker_num(key);
         summary_req r;
@@ -150,7 +150,7 @@ namespace henhouse::threaded
         return f;
     }
 
-    get_future server::get(const std::string& key, db::time_type t) const 
+    get_future server::get(const stde::string_view& key, db::time_type t) const 
     {
         auto n = worker_num(key);
 
@@ -162,7 +162,7 @@ namespace henhouse::threaded
         return f;
     }
 
-    diff_future server::diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const
+    diff_future server::diff(const stde::string_view& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const
     {
         auto n = worker_num(key);
 
@@ -176,9 +176,9 @@ namespace henhouse::threaded
         return f;
     }
 
-    std::size_t server::worker_num(const std::string& key) const
+    std::size_t server::worker_num(const stde::string_view& key) const
     {
-        auto h = std::hash<std::string>{}(key);
+        auto h = std::hash<stde::string_view>{}(key);
         auto n = h % _workers.size(); //exclude rank 0
 
         ENSURE_RANGE(n, 0, _workers.size());

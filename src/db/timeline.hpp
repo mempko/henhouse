@@ -118,8 +118,6 @@ namespace henhouse::db
             }
     };
 
-    using key_t = std::string;
-
     using data_type = util::mapped_vector<data_metadata, data_item>;
 
     struct summary_result
@@ -157,7 +155,6 @@ namespace henhouse::db
 
     struct timeline
     {
-        key_t key;
         index_type index;
         data_type data;
 

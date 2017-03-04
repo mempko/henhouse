@@ -271,7 +271,6 @@ namespace henhouse::db
         fs::path root = path;
 
         timeline t;
-        t.key = root.filename().string();
 
         fs::path idx_data = root / "_.i";
         t.index = std::move(index_type{idx_data, resolution});
