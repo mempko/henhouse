@@ -38,45 +38,39 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            REQUIRE(r.result);
-            r.result->set_value(w->db().get(r.key, r.time));
+            r.result.set_value(w->db().get(r.key, r.time));
         }
         catch(std::exception& e) 
         {
-            CHECK(r.result);
             std::cerr << "Error getting data: " << r.key 
                 << " " << r.time << ": " << e.what() << std::endl;
-            r.result->set_value(db::get_result{});
+            r.result.set_value(db::get_result{});
         }
 
         void operator()(diff_req& r)
         try
         {
             INVARIANT(w);
-            REQUIRE(r.result);
-            r.result->set_value(w->db().diff(r.key, r.a, r.b, r.index_offset));
+            r.result.set_value(w->db().diff(r.key, r.a, r.b, r.index_offset));
         }
         catch(std::exception& e) 
         {
-            CHECK(r.result);
             std::cerr << "Error diffing data: " << r.key
                 << " (" << r.a << ", " << r.b << "): " << e.what() << std::endl;
-            r.result->set_value(db::diff_result{});
+            r.result.set_value(db::diff_result{});
         }
 
         void operator()(summary_req& r)
         try
         {
             INVARIANT(w);
-            REQUIRE(r.result);
-            r.result->set_value(w->db().summary(r.key));
+            r.result.set_value(w->db().summary(r.key));
         }
         catch(std::exception& e) 
         {
-            CHECK(r.result);
             std::cerr << "Error summing data: " << r.key
                 << ": " << e.what() << std::endl;
-            r.result->set_value(db::summary_result{});
+            r.result.set_value(db::summary_result{});
         }
     };
 
@@ -146,33 +140,29 @@ namespace henhouse::threaded
         _workers[n]->queue().write(std::move(r));
     }
 
-    db::summary_result server::summary(const std::string& key) const 
+    summary_future server::summary(const std::string& key) const 
     {
         auto n = worker_num(key);
         summary_req r;
         r.key = key;
-        summary_promise p;
-        summary_future f = p.get_future();
-        r.result = &p;
+        summary_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
-        return f.get();
+        return f;
     }
 
-    db::get_result server::get(const std::string& key, db::time_type t) const 
+    get_future server::get(const std::string& key, db::time_type t) const 
     {
         auto n = worker_num(key);
 
         get_req r;
         r.key = key;
         r.time = t;
-        get_promise p;
-        get_future f = p.get_future();
-        r.result = &p;
+        get_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
-        return f.get();
+        return f;
     }
 
-    db::diff_result server::diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const
+    diff_future server::diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const
     {
         auto n = worker_num(key);
 
@@ -181,11 +171,9 @@ namespace henhouse::threaded
         r.a = a;
         r.b = b;
         r.index_offset = index_offset;
-        diff_promise p;
-        diff_future f = p.get_future();
-        r.result = &p;
+        diff_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
-        return f.get();
+        return f;
     }
 
     std::size_t server::worker_num(const std::string& key) const

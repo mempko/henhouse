@@ -4,6 +4,7 @@
 #include "service/threaded.hpp"
 
 #include <sstream>
+#include <vector>
 #include <limits>
 
 //for http endpoint
@@ -27,12 +28,15 @@
 
 
 namespace hdb = henhouse::db;
+namespace ht = henhouse::threaded;
 namespace ba = boost::algorithm;
 
 namespace henhouse::net
 {
     namespace
     {
+        const int PREV_INDEX_OFFSET = 0; //index offset to start diff query
+
         const std::size_t MAX_QUERY_SIZE = 10000;
         const std::string QUERY_TOO_LARGE = 
             "query size is too large. Max query must be under 10000 values";
@@ -298,7 +302,7 @@ namespace henhouse::net
                 REQUIRE(!key.empty());
                 REQUIRE_GREATER_EQUAL(b, a);
 
-                auto r = _db.diff(key, a, b, NO_OFFSET);
+                auto r = _db.diff(key, a, b, NO_OFFSET).get();
                 folly::dynamic o = folly::dynamic::object
                     ("sum", r.sum)
                     ("mean", r.mean)
@@ -320,7 +324,7 @@ namespace henhouse::net
             {
                 REQUIRE(!key.empty());
 
-                auto r = _db.summary(key);
+                auto r = _db.summary(key).get();
                 folly::dynamic o = folly::dynamic::object
                     ("from", r.from)
                     ("to", r.to)
@@ -396,33 +400,37 @@ namespace henhouse::net
                     const auto query_size = (b - a) / step;
                     if(query_size > MAX_QUERY_SIZE) throw bad_request( QUERY_TOO_LARGE );
 
-                    auto prev_index_offset = 0;
+                    //create place to put future results 
+                    std::vector<ht::diff_future> results;
+                    results.reserve(query_size);
 
-                    //TODO: Create iterator in db that can do this walk.
+                    //query db async storing the futures
                     int c = 0;
-
                     for(; a <= e; s+=step, a+=step, c++)
+                        results.emplace_back(_db.diff(key, s, a, PREV_INDEX_OFFSET));
+
+                    //query last
+                    results.emplace_back(_db.diff(key, s, b, PREV_INDEX_OFFSET));
+
+                    //process results and output to client
+                    for(size_t i = 0; i < results.size() - 1; i++) 
                     {
-                        const auto r = _db.diff(key, s, a, prev_index_offset);
-                        if(segment_size < r.resolution) 
+                        const auto v = results[i].get(); 
+                        if(segment_size < v.resolution) 
                         {
                             std::stringstream e;
-                            e << "the segment size " << segment_size << " is too small for the key \"" << key << "\" , must be bigger than " << r.resolution;
+                            e << "the segment size " << segment_size << " is too small for the key \"" << key << "\" , must be bigger than " << v.resolution;
                             throw bad_request( e.str() );
                         }
-
-                        prev_index_offset = r.index_offset;
-                        render_value(rb, a, extract_value(r));
+                        render_value(rb, a, extract_value(v));
                         rb.body(",");
-
                         //50 here should roughly be 1k for xy request, though likely larger.
                         //TODO don't use RequestBuilder, do it yourself.
                         if(c % 50 == 0) rb.send();
                     }
 
                     //output last
-                    const auto r = _db.diff(key, s, b, prev_index_offset);
-                    render_value(rb, b, extract_value(r));
+                    render_value(rb, b, extract_value(results[results.size() - 1].get()));
                 }
 
         private:

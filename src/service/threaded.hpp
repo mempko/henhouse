@@ -32,7 +32,7 @@ namespace henhouse::threaded
     {
         std::string key;
         db::time_type time;
-        get_promise* result;
+        get_promise result;
     };
 
     struct diff_req
@@ -41,13 +41,13 @@ namespace henhouse::threaded
         db::time_type a;
         db::time_type b;
         db::offset_type index_offset;
-        diff_promise* result;
+        diff_promise result;
     };
 
     struct summary_req
     {
         std::string key;
-        summary_promise* result;
+        summary_promise result;
 
     };
 
@@ -95,10 +95,10 @@ namespace henhouse::threaded
                     const db::time_type new_timeline_resolution);
             ~server();
 
-            db::summary_result summary(const std::string& key) const; 
-            db::get_result get(const std::string& key, db::time_type t) const; 
+            summary_future summary(const std::string& key) const; 
+            get_future get(const std::string& key, db::time_type t) const; 
             void put(const std::string& key, db::time_type t, db::count_type c);
-            db::diff_result diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const;
+            diff_future diff(const std::string& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const;
 
             void stop();
 
