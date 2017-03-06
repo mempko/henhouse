@@ -11,7 +11,7 @@ namespace stde = std::experimental;
 
 namespace henhouse::db
 {
-    using timeline_cache = folly::EvictingCacheMap<std::string, timeline>;
+    using timeline_cache = folly::EvictingCacheMap<folly::fbstring, timeline>;
 
     /**
      * Manages a cache of timelines based on key.

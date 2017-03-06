@@ -153,6 +153,12 @@ namespace henhouse::db
         data_item right;            //right bucket. 
     };
 
+    /**
+     * Manages getting and putting timeline data into and indexed structure 
+     * stored on disk. Uses memory mapped index and data mapped_arrays.
+     *
+     * This interface is NOT thread safe.
+     */
     struct timeline
     {
         index_type index;

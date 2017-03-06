@@ -18,6 +18,8 @@ namespace henhouse::util
                         const size_t new_size = PAGE_SIZE,
                         const float new_size_factor = GROW_FACTOR) 
                 {
+                    REQUIRE_GREATER(new_size, 0);
+
                     _new_size = std::max(new_size, sizeof(meta_t) + sizeof(data_type));
                     _data_file_path = data_file;
                     _new_size_factor = new_size_factor;

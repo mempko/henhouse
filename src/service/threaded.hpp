@@ -11,6 +11,7 @@
 #include "db/db.hpp"
 
 #include <folly/MPMCQueue.h>
+#include <folly/FBString.h>
 
 namespace stde = std::experimental;
 
@@ -26,21 +27,21 @@ namespace henhouse::threaded
 
     struct put_req
     {
-        stde::string_view key;
+        folly::fbstring key;
         db::time_type time;
         db::count_type count;
     };
 
     struct get_req
     {
-        stde::string_view key;
+        folly::fbstring key;
         db::time_type time;
         get_promise result;
     };
 
     struct diff_req
     {
-        stde::string_view key;
+        folly::fbstring key;
         db::time_type a;
         db::time_type b;
         db::offset_type index_offset;
@@ -51,7 +52,6 @@ namespace henhouse::threaded
     {
         stde::string_view key;
         summary_promise result;
-
     };
 
     using req = boost::variant<put_req, get_req, diff_req, summary_req>; 

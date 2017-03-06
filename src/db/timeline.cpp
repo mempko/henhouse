@@ -2,6 +2,7 @@
 #include "db/timeline.hpp"
 
 #include <exception>
+#include <thread>
 #include <fstream>
 #include <functional>
 #include <boost/filesystem.hpp>

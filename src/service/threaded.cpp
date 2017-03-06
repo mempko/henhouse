@@ -26,7 +26,7 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            w->db().put(r.key, r.time, r.count);
+            w->db().put({r.key.data(), r.key.size()}, r.time, r.count);
         }
         catch(std::exception& e) 
         {
@@ -38,7 +38,7 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            r.result.set_value(w->db().get(r.key, r.time));
+            r.result.set_value(w->db().get({r.key.data(), r.key.size()}, r.time));
         }
         catch(std::exception& e) 
         {
@@ -51,7 +51,7 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            r.result.set_value(w->db().diff(r.key, r.a, r.b, r.index_offset));
+            r.result.set_value(w->db().diff({r.key.data(), r.key.size()}, r.a, r.b, r.index_offset));
         }
         catch(std::exception& e) 
         {
@@ -64,7 +64,7 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            r.result.set_value(w->db().summary(r.key));
+            r.result.set_value(w->db().summary({r.key.data(), r.key.size()}));
         }
         catch(std::exception& e) 
         {
@@ -83,10 +83,15 @@ namespace henhouse::threaded
         auto& q = w->queue();
 
         while(!w->done())
+        try
         {
             req r;
             q.blockingRead(r);
             boost::apply_visitor(processeor, r);
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "error processing request: " << e.what() << std::endl;
         }
     }
 
@@ -106,7 +111,6 @@ namespace henhouse::threaded
 
         while(--workers)
         {
-
             auto w = std::make_unique<worker>(_root, queue_size, cache_size, new_timeline_resolution, &_done);
             auto t = std::make_unique<std::thread>(req_thread, w.get());
 
@@ -133,18 +137,14 @@ namespace henhouse::threaded
     {
         auto n = worker_num(key);
 
-        put_req r;
-        r.key = key;
-        r.time = t;
-        r.count = c;
+        put_req r {key.to_string(), t, c};
         _workers[n]->queue().write(std::move(r));
     }
 
     summary_future server::summary(const stde::string_view& key) const 
     {
         auto n = worker_num(key);
-        summary_req r;
-        r.key = key;
+        summary_req r{key.to_string()};
         summary_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
         return f;
@@ -154,9 +154,7 @@ namespace henhouse::threaded
     {
         auto n = worker_num(key);
 
-        get_req r;
-        r.key = key;
-        r.time = t;
+        get_req r{key.to_string(), t};
         get_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
         return f;
@@ -166,11 +164,7 @@ namespace henhouse::threaded
     {
         auto n = worker_num(key);
 
-        diff_req r;
-        r.key = key;
-        r.a = a;
-        r.b = b;
-        r.index_offset = index_offset;
+        diff_req r{key.to_string(), a, b, index_offset};
         diff_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
         return f;

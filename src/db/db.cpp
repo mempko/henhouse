@@ -83,6 +83,7 @@ namespace henhouse::db
     timeline& timeline_db::get_tl(const stde::string_view& key)
     {
         REQUIRE_FALSE(key.empty());
+
         sanatize_key(_clean_key, key);
         const auto t = _tls.find(_clean_key);
         if(t != std::end(_tls)) return t->second;
@@ -93,6 +94,7 @@ namespace henhouse::db
 
         _tls.set(_clean_key, from_directory(key_dir.string(), _new_tl_resolution));
         auto p = _tls.find(_clean_key);
+
         return p->second;
     }
 
