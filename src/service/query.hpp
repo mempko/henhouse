@@ -74,13 +74,27 @@ namespace henhouse::net
 
     }
 
-    struct diff_results 
+    struct values_result
     {
         stde::string_view key;
         std::vector<ht::diff_future> results;
     };
 
-    using key_diff_results = std::vector<diff_results>;
+    struct summary_result
+    {
+        stde::string_view key;
+        ht::summary_future result;
+    };
+
+    struct diff_result
+    {
+        stde::string_view key;
+        ht::diff_future result;
+    };
+
+    using key_values_result = std::vector<values_result>;
+    using summary_results = std::vector<summary_result>;
+    using diff_results = std::vector<diff_result>;
 
     class query_request_handler : public proxygen::RequestHandler {
         public:
@@ -154,13 +168,21 @@ namespace henhouse::net
 
                     folly::dynamic out = folly::dynamic::array();
 
-                    for_each_key(keys, [&](const stde::string_view & key) 
-                            {
-                            folly::dynamic s = folly::dynamic::object
-                            ("key", key.to_string())
-                            ("stats", summary(key));
-                            out.push_back(std::move(s));
-                            });
+                    summary_results results;
+
+                    for_each_key(keys, [&](const stde::string_view & key)
+                    {
+                        summary_result r{key, _db.summary(key)};
+                        results.emplace_back(std::move(r));
+                    });
+
+                    for(auto& r: results)
+                    {
+                        folly::dynamic s = folly::dynamic::object
+                        ("key", r.key.to_string())
+                        ("stats", summary(r.result.get(), r.key));
+                        out.push_back(std::move(s));
+                    }
 
                     rb.body(folly::toJson(out))
                         .status(200, "OK")
@@ -197,15 +219,22 @@ namespace henhouse::net
 
                     if(a > b) std::swap(a, b);
 
+                    diff_results results;
+                    for_each_key(keys, [&](const stde::string_view & key)
+                    {
+                        diff_result r{key, _db.diff(key, a, b, NO_OFFSET)};
+                        results.emplace_back(std::move(r));
+                    });
+
                     folly::dynamic out = folly::dynamic::array();
 
-                    for_each_key(keys, [&](const stde::string_view & key) 
-                            {
-                            folly::dynamic s = folly::dynamic::object
-                            ("key", key.to_string())
-                            ("stats", diff(key, a, b));
-                            out.push_back(std::move(s));
-                            });
+                    for(auto& r: results)
+                    {
+                        folly::dynamic s = folly::dynamic::object
+                            ("key", r.key.to_string())
+                            ("stats", diff(r.result.get(), r.key));
+                        out.push_back(std::move(s));
+                    }
 
                     rb.body(folly::toJson(out))
                         .status(200, "OK")
@@ -307,14 +336,11 @@ namespace henhouse::net
             }
 
             folly::dynamic diff(
-                    const stde::string_view& key, 
-                    hdb::time_type a, 
-                    hdb::time_type b)
+                    const db::diff_result& r,
+                    const stde::string_view& key)
             {
                 REQUIRE(!key.empty());
-                REQUIRE_GREATER_EQUAL(b, a);
 
-                auto r = _db.diff(key, a, b, NO_OFFSET).get();
                 folly::dynamic o = folly::dynamic::object
                     ("sum", r.sum)
                     ("mean", r.mean)
@@ -332,11 +358,10 @@ namespace henhouse::net
                 return o;
             }
 
-            folly::dynamic summary(const stde::string_view& key)
+            folly::dynamic summary(const db::summary_result& r, const stde::string_view& key)
             {
                 REQUIRE(!key.empty());
 
-                auto r = _db.summary(key).get();
                 folly::dynamic o = folly::dynamic::object
                     ("from", r.from)
                     ("to", r.to)
@@ -361,7 +386,7 @@ namespace henhouse::net
                         bool is_csv)
                 {
                     //first query the values asynchronously
-                    key_diff_results results;
+                    key_values_result results;
                     for_each_key(keys, [&](const stde::string_view& key) 
                     {
                         results.emplace_back(query_values(key, a, b, step, segment_size));
@@ -398,7 +423,7 @@ namespace henhouse::net
 
                 }
 
-                diff_results query_values(
+                values_result query_values(
                         const stde::string_view& key, 
                         hdb::time_type a, 
                         hdb::time_type b,
@@ -419,7 +444,7 @@ namespace henhouse::net
                     if(query_size > MAX_QUERY_SIZE) throw bad_request( QUERY_TOO_LARGE );
 
                     //create place to put future results 
-                    diff_results r;
+                    values_result r;
                     r.key = key;
                     r.results.reserve(query_size);
 
@@ -436,7 +461,7 @@ namespace henhouse::net
             template<typename render_func, typename extract_func>
                 void render_key_values(
                         proxygen::ResponseBuilder& rb,
-                        diff_results& r, 
+                        values_result& r,
                         hdb::time_type a, 
                         hdb::time_type b,
                         hdb::time_type segment_size,
