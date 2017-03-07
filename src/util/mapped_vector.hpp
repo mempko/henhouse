@@ -25,14 +25,17 @@ namespace henhouse::util
                     _new_size_factor = new_size_factor;
 
                     //open index data. New file size is new_size
-                    _data_file = std::make_shared<bio::mapped_file>();
+                    _data_file = std::make_unique<bio::mapped_file>();
                     const bool created = open(*_data_file, data_file, new_size);
 
                     _metadata = reinterpret_cast<meta_t*>(_data_file->data());
                     _items = reinterpret_cast<data_type*>(_data_file->data() + sizeof(meta_t));
 
                     if(created) 
+                    {
                         *_metadata = meta_t{};
+                        _metadata->size = 0;
+                    }
 
                     //compute max elements
                     _max_items = (_data_file->size() - sizeof(meta_t)) / sizeof(data_type);
@@ -179,9 +182,11 @@ namespace henhouse::util
                     _data_file->resize(new_size);
                     _metadata = reinterpret_cast<meta_t*>(_data_file->data());
                     _items = reinterpret_cast<data_type*>(_data_file->data() + sizeof(meta_t));
+                    CHECK_GREATER(_data_file->size(), sizeof(meta_t));
                     _max_items = (_data_file->size() - sizeof(meta_t)) / sizeof(data_type);
 
                     ENSURE_GREATER(_max_items, old_max);
+                    ENSURE_GREATER_EQUAL(_max_items, _metadata->size);
                 }
 
             protected:

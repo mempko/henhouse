@@ -9,7 +9,7 @@
 namespace bio = boost::iostreams;
 namespace henhouse::util
 {
-    using mapped_file_ptr = std::shared_ptr<bio::mapped_file>;
+    using mapped_file_ptr = std::unique_ptr<bio::mapped_file>;
 
     const std::size_t PAGE_SIZE = bio::mapped_file::alignment();
     const float GROW_FACTOR = 1.5;

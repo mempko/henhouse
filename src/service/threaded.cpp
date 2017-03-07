@@ -26,7 +26,8 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            w->db().put({r.key.data(), r.key.size()}, r.time, r.count);
+            REQUIRE_GREATER(r.key.size(), 0);
+            w->db().put(r.key.data(), r.time, r.count);
         }
         catch(std::exception& e) 
         {
@@ -38,7 +39,8 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            r.result.set_value(w->db().get({r.key.data(), r.key.size()}, r.time));
+            REQUIRE_GREATER(r.key.size(), 0);
+            r.result.set_value(w->db().get(r.key, r.time));
         }
         catch(std::exception& e) 
         {
@@ -51,7 +53,8 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            r.result.set_value(w->db().diff({r.key.data(), r.key.size()}, r.a, r.b, r.index_offset));
+            REQUIRE_GREATER(r.key.size(), 0);
+            r.result.set_value(w->db().diff(r.key, r.a, r.b, r.index_offset));
         }
         catch(std::exception& e) 
         {
@@ -64,7 +67,8 @@ namespace henhouse::threaded
         try
         {
             INVARIANT(w);
-            r.result.set_value(w->db().summary({r.key.data(), r.key.size()}));
+            REQUIRE_GREATER(r.key.size(), 0);
+            r.result.set_value(w->db().summary(r.key));
         }
         catch(std::exception& e) 
         {
@@ -135,16 +139,24 @@ namespace henhouse::threaded
 
     void server::put(const stde::string_view& key, db::time_type t, db::count_type c)
     {
-        auto n = worker_num(key);
+        std::string safe_key;
+        safe_key.reserve(key.size());
+        db::sanatize_key(safe_key, key);
 
-        put_req r {key.to_string(), t, c};
+        auto n = worker_num(safe_key);
+
+        put_req r {std::move(safe_key), t, c};
         _workers[n]->queue().write(std::move(r));
     }
 
     summary_future server::summary(const stde::string_view& key) const 
     {
-        auto n = worker_num(key);
-        summary_req r{key.to_string()};
+        std::string safe_key;
+        safe_key.reserve(key.size());
+        db::sanatize_key(safe_key, key);
+
+        auto n = worker_num(safe_key);
+        summary_req r{std::move(safe_key)};
         summary_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
         return f;
@@ -152,9 +164,13 @@ namespace henhouse::threaded
 
     get_future server::get(const stde::string_view& key, db::time_type t) const 
     {
-        auto n = worker_num(key);
+        std::string safe_key;
+        safe_key.reserve(key.size());
+        db::sanatize_key(safe_key, key);
 
-        get_req r{key.to_string(), t};
+        auto n = worker_num(safe_key);
+
+        get_req r{std::move(safe_key), t};
         get_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
         return f;
@@ -162,9 +178,13 @@ namespace henhouse::threaded
 
     diff_future server::diff(const stde::string_view& key, db::time_type a, db::time_type b, const db::offset_type index_offset) const
     {
-        auto n = worker_num(key);
+        std::string safe_key;
+        safe_key.reserve(key.size());
+        db::sanatize_key(safe_key, key);
 
-        diff_req r{key.to_string(), a, b, index_offset};
+        auto n = worker_num(safe_key);
+
+        diff_req r{std::move(safe_key), a, b, index_offset};
         diff_future f = r.result.get_future();
         _workers[n]->queue().write(std::move(r));
         return f;

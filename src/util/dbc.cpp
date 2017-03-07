@@ -1,6 +1,7 @@
 #include "util/dbc.hpp"
 
 #include <cstdlib>
+#include <csignal>
 
 #ifndef _WIN64
 #include <execinfo.h>
@@ -40,6 +41,7 @@ namespace henhouse::util
         trace(s);
         std::cerr << s.str() << std::endl;
         DIALOG_CALLBACK(s.str().c_str());
+
         exit(1);
     }
 

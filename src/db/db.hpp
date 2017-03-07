@@ -5,17 +5,19 @@
 
 #include <experimental/string_view>
 #include <folly/EvictingCacheMap.h>
-#include <folly/FBString.h>
 
 namespace stde = std::experimental;
 
 namespace henhouse::db
 {
-    using timeline_cache = folly::EvictingCacheMap<folly::fbstring, timeline>;
+    using timeline_cache = folly::EvictingCacheMap<std::size_t, timeline>;
 
     /**
      * Manages a cache of timelines based on key.
      * Note this interface is NOT thread safe.
+     *
+     * The key passed into the members should be sanatized first using the satantize
+     * function.
      */
     class timeline_db 
     {
@@ -26,7 +28,6 @@ namespace henhouse::db
                 REQUIRE(!root.empty());
                 REQUIRE_GREATER(cache_size, 0);
                 REQUIRE_GREATER(new_timeline_resolution, 0);
-                _clean_key.reserve(256);
             }
 
         public:
@@ -47,7 +48,11 @@ namespace henhouse::db
             boost::filesystem::path _root;
             time_type _new_tl_resolution;
             mutable timeline_cache _tls;
-            mutable std::string _clean_key;
     };
+
+    /**
+     * Sanitizes the key to valid characters used in the db.
+     */
+    void sanatize_key(std::string& res, const stde::string_view& key);
 }
 #endif

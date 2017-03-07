@@ -15,33 +15,38 @@ namespace henhouse::db
         const int MAX_DIR_LENGTH = 8;
         const int MAX_DIR_SPLIT_LENGTH = MAX_DIR_LENGTH * 4;
         const offset_type NO_OFFSET = 0;
-        void sanatize_key(std::string& res, const stde::string_view& key)
-        {
-            res.assign(std::begin(key), std::end(key));
-            std::replace_if(std::begin(res), std::end(res),
-                    [](char c)
-                    {
-                    return !((c >= '0' && c <= '9') ||
-                            (c >= 'A' && c <= 'Z') ||
-                            (c >= 'a' && c <= 'z'));
-                    }, '_');
-        }
 
-        fs::path get_key_dir(const fs::path& root, const std::string& key)
+        fs::path get_key_dir(const fs::path& root, const stde::string_view& key)
         {
             REQUIRE(!key.empty());
             fs::path p = root;
 
-            int i = 0;
-            int s = 0;
-            for(; i < key.size() && i < MAX_DIR_SPLIT_LENGTH; i += MAX_DIR_LENGTH)
-                p /= key.substr(i, MAX_DIR_LENGTH).c_str();
+            for(std::size_t i = 0; i < key.size() && i < MAX_DIR_SPLIT_LENGTH; i += MAX_DIR_LENGTH)
+            {
+                const auto d = key.substr(i, MAX_DIR_LENGTH);
+                p.append(d.begin(), d.end());
+            }
 
             if(key.size() > MAX_DIR_SPLIT_LENGTH)
-                p /= key.substr(MAX_DIR_SPLIT_LENGTH, key.size() - MAX_DIR_SPLIT_LENGTH).c_str();
+            {
+                const auto d = key.substr(MAX_DIR_SPLIT_LENGTH, key.size() - MAX_DIR_SPLIT_LENGTH);
+                p.append(d.begin(), d.end());
+            }
 
             return p;
         }
+    }
+
+    void sanatize_key(std::string& res, const stde::string_view& key)
+    {
+        res.assign(key.data(), key.size());
+        std::replace_if(std::begin(res), std::end(res),
+                [](char c)
+                {
+                return !((c >= '0' && c <= '9') ||
+                        (c >= 'A' && c <= 'Z') ||
+                        (c >= 'a' && c <= 'z'));
+                }, '_');
     }
 
     summary_result timeline_db::summary(const stde::string_view& key) const
@@ -84,32 +89,36 @@ namespace henhouse::db
     {
         REQUIRE_FALSE(key.empty());
 
-        sanatize_key(_clean_key, key);
-        const auto t = _tls.find(_clean_key);
+        const auto h = std::hash<stde::string_view>{}(key);
+
+        const auto t = _tls.find(h);
         if(t != std::end(_tls)) return t->second;
 
-        auto key_dir = get_key_dir(_root, _clean_key);
+        const auto key_dir = get_key_dir(_root, key);
 
         if(!fs::exists(key_dir)) fs::create_directories(key_dir);
 
-        _tls.set(_clean_key, from_directory(key_dir.string(), _new_tl_resolution));
-        auto p = _tls.find(_clean_key);
+        _tls.set(h, from_directory(key_dir.string(), _new_tl_resolution));
+        auto p = _tls.find(h);
 
         return p->second;
     }
 
     const timeline& timeline_db::get_tl(const stde::string_view& key) const
     {
-        sanatize_key(_clean_key, key);
-        const auto t = _tls.find(_clean_key);
+        REQUIRE_FALSE(key.empty());
+
+        const auto h = std::hash<stde::string_view>{}(key);
+
+        const auto t = _tls.find(h);
         if(t != std::end(_tls)) return t->second;
 
-        fs::path key_dir = get_key_dir(_root, _clean_key);
+        const auto key_dir = get_key_dir(_root, key);
 
         if(!fs::exists(key_dir)) fs::create_directories(key_dir);
 
-        _tls.set(_clean_key, from_directory(key_dir.string(), _new_tl_resolution));
-        auto p = _tls.find(_clean_key);
+        _tls.set(h, from_directory(key_dir.string(), _new_tl_resolution));
+        auto p = _tls.find(h);
         return p->second;
     }
 }
