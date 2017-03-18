@@ -1,4 +1,4 @@
-#src
+# src
 
 Henhouse's source code is organized around libraries where the main executable is
 found at [henhouse/henhouse.cpp](henhouse/henhouse.cpp)

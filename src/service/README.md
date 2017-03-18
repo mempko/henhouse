@@ -1,19 +1,19 @@
-#service
+# service
 
 This directory implements the HTTP and Graphite compatible services.
 
-#HTTP Service
+# HTTP Service
 
 The HTTP service only has a query interface. To put data into henhouse you must
 use the graphite compatible input service
 
-##/ping
+## /ping
 
-###response
+### response
 
 "pong"
 
-##/summary
+## /summary
 
 The summary endpoint gives you overall data about a timeline.
 
@@ -22,7 +22,7 @@ The summary endpoint gives you overall data about a timeline.
 |:----------------------------|:--------------------------------------------------------------------------------------------------------------|
 | keys                        |  Comma separated list of keys to query|
 
-###response
+### response
 
 The response is JSON object where the top level attributes are all keys requested. 
 Each key is has the following attributes returned.
@@ -37,7 +37,7 @@ Each key is has the following attributes returned.
 | variance                    |  Variance of all values in the timeline|
 | points                      |  Total amount of data points in the timeline|
 
-##/diff
+## /diff
 
 The diff endpoint allows you to query a timeline between two time ranges
 
@@ -48,7 +48,7 @@ The diff endpoint allows you to query a timeline between two time ranges
 | a                           |  Unix timestamp of beginning of time range|
 | b                           |  Unix timestamp of end of time range|
 
-###response
+### response
 
 The response is JSON object where the top level attributes are all the keys requested.
 Each attribute key has the following attributes returned.
@@ -62,7 +62,7 @@ Each attribute key has the following attributes returned.
 | resolution                  |  Resolution of timeline in seconds|
 | left,right                  |  left and right bucket {"val": .., "agg": ..} where val is the value in that bucket and agg is sum of values up to that point.|
 
-##/values
+## /values
 
 The diff endpoint allows you to query a timeline between two time ranges
 
@@ -78,7 +78,7 @@ The diff endpoint allows you to query a timeline between two time ranges
 | sum\|var\|mean\|agg         |  If specified then the sum, mean, ,variance, and aggregate is returned. Default returns the sum|
 | xy                          |  If specified then each point is specified as a json object with x and y attributes, Default is to return an array of numbers|
 
-###response
+### response
 
 The response is JSON object where the top level attributes are all the keys requested.
 Each attribute key is an array of points. If xy is specified then each point is a JSON object specified below.
@@ -89,7 +89,7 @@ Each attribute key is an array of points. If xy is specified then each point is 
 | y                           |  The value (mean,sum, or variance) of the data at x time|
 
 
-#Graphite Compatible Input Service
+# Graphite Compatible Input Service
 
 The graphite compatible TCP socket reads data where each data point is separated
 by newline. Each data point is specified as
