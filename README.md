@@ -48,13 +48,19 @@ Download Dependencies.
 - [folly](https://github.com/facebook/folly)
 - [proxygen](https://github.com/facebook/proxygen)
 
-Go to henhouse project directory and
+Go to Henhouse project directory and
 run...
 
     mkdir build
     cmake ..
     make -j
     ./src/henhouse/henhouse
+
+#Query Interface
+
+Henhouse provides both a HTTP query service and a Graphite compatible input service.
+
+You can read about how to use these services [here](src/service/README.md)
 
 
 # Directories
