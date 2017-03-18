@@ -56,7 +56,7 @@ run...
     make -j
     ./src/henhouse/henhouse
 
-#Query Interface
+# Query Interface
 
 Henhouse provides both a HTTP query service and a Graphite compatible input service.
 
