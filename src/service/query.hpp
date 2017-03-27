@@ -180,7 +180,7 @@ namespace henhouse::net
                     {
                         folly::dynamic s = folly::dynamic::object
                         ("key", r.key.to_string())
-                        ("stats", summary(r.result.get(), r.key));
+                        ("stats", summary(r.result.get()));
                         out.push_back(std::move(s));
                     }
 
@@ -232,7 +232,7 @@ namespace henhouse::net
                     {
                         folly::dynamic s = folly::dynamic::object
                             ("key", r.key.to_string())
-                            ("stats", diff(r.result.get(), r.key));
+                            ("stats", diff(r.result.get()));
                         out.push_back(std::move(s));
                     }
 
@@ -335,11 +335,8 @@ namespace henhouse::net
                 delete this;
             }
 
-            folly::dynamic diff(
-                    const db::diff_result& r,
-                    const stde::string_view& key)
+            folly::dynamic diff(const db::diff_result& r)
             {
-                REQUIRE(!key.empty());
 
                 folly::dynamic o = folly::dynamic::object
                     ("sum", r.sum)
@@ -358,10 +355,8 @@ namespace henhouse::net
                 return o;
             }
 
-            folly::dynamic summary(const db::summary_result& r, const stde::string_view& key)
+            folly::dynamic summary(const db::summary_result& r)
             {
-                REQUIRE(!key.empty());
-
                 folly::dynamic o = folly::dynamic::object
                     ("from", r.from)
                     ("to", r.to)
