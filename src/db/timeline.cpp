@@ -22,8 +22,9 @@ namespace henhouse::db
      */
     void propogate(data_item prev, data_item& current)
     {
-        current.integral = prev.integral + current.value;
-        current.second_integral = prev.second_integral + (current.value * current.value);
+        const auto v = current.value;
+        current.integral = prev.integral + v;
+        current.second_integral = prev.second_integral + (v  * v);
     }
 
     //Adds a count c to the current bucket and updates the partial sum
@@ -75,6 +76,7 @@ namespace henhouse::db
 
     bool timeline::put(time_type t, count_type c)
     {
+        //We already have data, let's add and index new point.
         if(index.size() > 0)
         {
             const auto last_range = index.cend() - 1;
@@ -97,7 +99,7 @@ namespace henhouse::db
                     //to catch up.
                     if(data.size() - pos < ADD_BUCKET_BACK_LIMIT)
                     {
-                        const auto prev = pos > 0 ? data[pos - 1] : data_item {0, 0, 0};
+                        const auto prev = pos > 0 ? data[pos - 1] : data_item{0, 0, 0};
                         update_current(prev, data[pos], c);
                         for(auto p = pos + 1; p < data.size(); p++)
                             propogate(data[p-1], data[p]);
@@ -109,7 +111,10 @@ namespace henhouse::db
                 {
                     const auto last_pos = data.size() - 1;
                     const auto prev = data[last_pos];
-                    data_item current = { c, 0};
+
+                    //don't compute integral and second_integral
+                    //because propogate will overwrite
+                    data_item current{c, 0, 0};
                     propogate(prev, current);
                     data.push_back(current);
 
@@ -130,11 +135,12 @@ namespace henhouse::db
             }
             else return false;
         }
+        //We have an empty timeline, let's add initial data point and index it.
         else
         {
             CHECK_EQUAL(data.size(), 0);
 
-            data_item v{ c, 0, 0};
+            data_item v{c, c, c * c};
             data.push_back(v);
 
             index_item i = {t, 0};
