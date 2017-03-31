@@ -52,7 +52,6 @@ namespace henhouse::db
         time_type time;
         offset_type pos;
         offset_type offset;
-        bool empty;
     };
 
     class index_type : public util::mapped_vector<index_metadata, index_item>
@@ -96,23 +95,20 @@ namespace henhouse::db
                 auto offset = offset_time / _metadata->resolution;
                 const auto pos = range->pos + offset;
 
-                bool empty = false;
                 //if we are not in last range, then check for overlap
                 //with next index element
                 if(next != cend() && pos >= next->pos)
-                {
                     offset = next->pos - range->pos - 1;
-                    empty = true;
-                }
+
                 const offset_type index_offset = range - cbegin();
-                return pos_result{index_offset, range->time, range->pos, offset, empty};
+                return pos_result{index_offset, range->time, range->pos, offset};
             }
 
             pos_result find_pos(time_type t, const offset_type offset) const
             {
-                if(empty()) return pos_result {0, t, 0, 0, true};
+                if(empty()) return pos_result {0, t, 0, 0};
                 const auto range = find_range(t, offset);
-                if(range == nullptr) return pos_result{0, front().time, 0, 0, true};
+                if(range == nullptr) return pos_result{0, front().time, 0, 0};
 
                 return find_pos_from_range(t, range, range + 1);
             }
@@ -168,11 +164,7 @@ namespace henhouse::db
 
         summary_result summary() const;  
 
-        //get_a returns the value at the bucket before time t bucket.
-        get_result get_a(time_type t, const offset_type index_offset) const;  
-        //get_v returns the value at the bucket at time t.
-        get_result get_b(time_type t, const offset_type index_offset) const;  
-
+        get_result get(time_type t, const offset_type index_offset) const;
         diff_result diff(time_type a, time_type b, const offset_type index_offset) const;
     };
 

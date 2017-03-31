@@ -58,7 +58,7 @@ namespace henhouse::db
     get_result timeline_db::get(const stde::string_view& key, time_type t) const 
     {
         const auto& tl = get_tl(key);
-        return tl.get_b(t, NO_OFFSET);
+        return tl.get(t, NO_OFFSET);
     }
 
     bool timeline_db::put(const stde::string_view& key, time_type t, count_type count)

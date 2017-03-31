@@ -198,37 +198,19 @@ namespace henhouse::db
         const auto pos = r.pos + r.offset;
         if(pos < size) return;
         r.offset = size - r.pos - 1;
-        r.empty = true;
 
         ENSURE_RANGE(r.pos + r.offset, 0, size);
     }
 
-
-    get_result timeline::get_a(time_type t, const offset_type index_offset) const  
+    get_result timeline::get(time_type t, const offset_type index_offset) const
     {
         auto p = index.find_pos(t, index_offset);
 
         clamp(p, data.size());
-        const auto i = p.pos + p.offset + (p.empty ? 1 : 0);
-        const auto dat = i > 0 ? data[i-1] : data_item{0,0,0};
 
-        return get_result 
-        { 
-            p.index_offset,
-                t,
-                p.time, 
-                p.pos,
-                p.offset,
-                dat
-        };
-    }
-
-    get_result timeline::get_b(time_type t, const offset_type index_offset) const  
-    {
-        auto p = index.find_pos(t, index_offset);
-
-        clamp(p, data.size());
-        const auto dat = data[p.pos + p.offset];
+        // zero out data before beginning of collection
+        const bool before_beginning =  t < p.time;
+        const auto dat = before_beginning ? data_item{0,0,0} : data[p.pos + p.offset];
 
         return get_result 
         { 
@@ -249,8 +231,8 @@ namespace henhouse::db
         if(a > b) std::swap(a,b);
         if(data.size() == 0) return diff_result{ resolution, 0, 0, 0, 0, 0, {0}, {0}};
 
-        auto ar = get_a(a, index_offset);
-        auto br = get_b(b, index_offset);
+        auto ar = get(a, index_offset);
+        auto br = get(b, index_offset);
 
         b = std::max(br.query_time, br.range_time);
         a = std::min(ar.query_time, b);
