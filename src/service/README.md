@@ -64,8 +64,8 @@ Each attribute key has the following attributes returned.
 
 ## /values
 
-The diff endpoint allows you to query a timeline between two time ranges
-
+The diff endpoint allows you to query a timeline between two time ranges or a
+set of time ranges defined by a json array of timestamps.
 
 | Argument                    | Description                                                                                                  |
 |:----------------------------|:--------------------------------------------------------------------------------------------------------------|
@@ -77,6 +77,15 @@ The diff endpoint allows you to query a timeline between two time ranges
 | csv                         |  If this argument exists the data is returned in CSV format instead of JSON|
 | sum\|var\|mean\|agg         |  If specified then the sum, mean, ,variance, and aggregate is returned. Default returns the sum|
 | xy                          |  If specified then each point is specified as a json object with x and y attributes, Default is to return an array of numbers|
+
+You can also provide a json array of timestamps which defines a discrete set of
+buckets.
+
+`
+  [1491371283, 1491371284, 1491371285]
+`
+
+Above payload will return two results, one from 1491371283 to 1491371284 and another from 1491371284 to 1491371284
 
 ### response
 

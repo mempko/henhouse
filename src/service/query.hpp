@@ -277,24 +277,6 @@ namespace henhouse::net
                         return;
                     }
 
-                    auto a = req.hasQueryParam("a") ? 
-                        lexical_cast<std::uint64_t>(req.getQueryParam("a")) :
-                        0;
-
-                    auto b = req.hasQueryParam("b") ? 
-                        lexical_cast<std::uint64_t>(req.getQueryParam("b")) :
-                        std::time(0);
-
-                    if(a > b) std::swap(a, b);
-
-                    auto step = req.hasQueryParam("step") ? 
-                        lexical_cast<std::uint64_t>(req.getQueryParam("step")) :
-                        1;
-
-                    auto segment_size = req.hasQueryParam("size") ? 
-                        lexical_cast<std::uint64_t>(req.getQueryParam("size")) :
-                        step;
-
                     auto extract_func = get_extract_func(req);
 
                     bool is_csv = req.hasQueryParam("csv");
@@ -314,7 +296,54 @@ namespace henhouse::net
                     };
 
                     rb.status(200, "OK");
-                    render_values(rb, keys, a, b, step, segment_size, render_func, extract_func, is_csv);
+
+                    //first query the values asynchronously
+                    key_values_result results;
+
+                    if(_body)
+                    {
+                        const auto body = _body->moveToFbString();
+                        const auto payload = folly::parseJson(body);
+
+                        if(!payload.isArray() || payload.size() < 2)
+                        {
+                            rb.status(400, "Payload must be an array of numbers of at least two numbers").sendWithEOM();
+                            return;
+                        }
+
+                        for_each_key(keys, [&](const stde::string_view& key) 
+                        {
+                            results.emplace_back(query_values(key, payload));
+                        });
+                    }
+                    else
+                    {
+                        auto a = req.hasQueryParam("a") ?
+                            lexical_cast<std::uint64_t>(req.getQueryParam("a")) :
+                            0;
+
+                        auto b = req.hasQueryParam("b") ?
+                            lexical_cast<std::uint64_t>(req.getQueryParam("b")) :
+                            std::time(0);
+
+                        if(a > b) std::swap(a, b);
+
+                        auto step = req.hasQueryParam("step") ?
+                            lexical_cast<std::uint64_t>(req.getQueryParam("step")) :
+                            1;
+
+                        auto segment_size = req.hasQueryParam("size") ?
+                            lexical_cast<std::uint64_t>(req.getQueryParam("size")) :
+                            step;
+
+                        for_each_key(keys, [&](const stde::string_view& key)
+                        {
+                            results.emplace_back(query_values(key, a, b, step, segment_size));
+                        });
+                    }
+
+                    //render values as results come in
+                    render_values(results, rb, keys, render_func, extract_func, is_csv);
                     rb.sendWithEOM();
                 }
                 else
@@ -370,31 +399,21 @@ namespace henhouse::net
 
             template<typename render_func, typename extract_func>
                 void render_values(
+                        key_values_result& results,
                         proxygen::ResponseBuilder& rb,
                         const std::string& keys, 
-                        hdb::time_type a, 
-                        hdb::time_type b,
-                        hdb::time_type step,
-                        hdb::time_type segment_size,
                         render_func render_value,
                         extract_func extract_value,
                         bool is_csv)
                 {
-                    //first query the values asynchronously
-                    key_values_result results;
-                    for_each_key(keys, [&](const stde::string_view& key) 
-                    {
-                        results.emplace_back(query_values(key, a, b, step, segment_size));
-                    });
-
-                    //Then render the result depending on csv vs json
+                    //render the result depending on csv vs json
                     if(is_csv) 
                     {
                         for(auto& r: results)
                         {
                             rb.body(r.key.to_string());
                             rb.body(",");
-                            render_key_values(rb, r, a, b, segment_size, render_value, extract_value);
+                            render_key_values(rb, r, render_value, extract_value);
                             rb.body("\n");
                         };
                     }
@@ -410,7 +429,7 @@ namespace henhouse::net
                             rb.body("\"");
                             rb.body(r.key.to_string());
                             rb.body("\":[");
-                            render_key_values(rb, r, a, b, segment_size, render_value, extract_value);
+                            render_key_values(rb, r, render_value, extract_value);
                             rb.body("]");
                         };
                         rb.body("}");
@@ -418,6 +437,7 @@ namespace henhouse::net
 
                 }
 
+                //query even buckets based on step and segment size from a to b
                 values_result query_values(
                         const stde::string_view& key, 
                         hdb::time_type a, 
@@ -453,17 +473,44 @@ namespace henhouse::net
                     return r;
                 }
 
+                //query values based on discrete units specified in the payload
+                values_result query_values(
+                        const stde::string_view& key,
+                        const folly::dynamic& payload)
+                try
+                {
+                    REQUIRE(payload.isArray());
+                    REQUIRE_GREATER(payload.size(), 1);
+
+                    //create place to put future results
+                    values_result r;
+                    r.key = key;
+                    r.results.reserve(payload.size() - 1);
+
+                    //query db async storing the futures
+
+                    auto s =  payload[0].getInt();
+                    for(int i = 1; i < payload.size(); i++)
+                    {
+                        const auto e = payload[i].getInt();
+                        r.results.emplace_back(_db.diff(key, s, e, PREV_INDEX_OFFSET));
+                        s = e;
+                    }
+
+                    return r;
+                }
+                catch(...)
+                {
+                    throw bad_request("Expected the payload to be an array of integers");
+                }
+
             template<typename render_func, typename extract_func>
                 void render_key_values(
                         proxygen::ResponseBuilder& rb,
                         values_result& r,
-                        hdb::time_type a, 
-                        hdb::time_type b,
-                        hdb::time_type segment_size,
                         render_func render_value,
                         extract_func extract_value)
                 {
-                    REQUIRE_GREATER_EQUAL(b, a);
                     REQUIRE_FALSE(r.key.empty());
                     REQUIRE_FALSE(r.results.empty());
 
@@ -472,12 +519,7 @@ namespace henhouse::net
                     for(size_t i = 0; i < r.results.size() - 1; i++, c++) 
                     {
                         const auto v = r.results[i].get(); 
-                        if(segment_size < v.resolution) 
-                        {
-                            std::stringstream e;
-                            e << "the segment size " << segment_size << " is too small for the key \"" << r.key << "\" , must be bigger than " << v.resolution;
-                            throw bad_request( e.str() );
-                        }
+
                         render_value(rb, v.a, extract_value(v));
                         rb.body(",");
                         //50 here should roughly be 1k for xy request, though likely larger.
