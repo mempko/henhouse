@@ -48,7 +48,14 @@ namespace henhouse::db
      *          = (mean of squared x) - mean^2
      *          = (mean of squared x) - (mean squared)
      */
-    diff_result diff_buckets(const time_type resolution, const offset_type index_offset, const data_item a, const data_item b, const count_type n)
+    diff_result diff_buckets(
+            const time_type ta,          //time from
+            const time_type tb,          //time to
+            const time_type resolution,  //resolution of time buckets
+            const offset_type index_offset,
+            const data_item a,           //bucket from
+            const data_item b,           //bucket to
+            const count_type n)          //number of buckets
     {
         REQUIRE_GREATER(resolution, 0);
         REQUIRE_GREATER(n, 0);
@@ -62,15 +69,17 @@ namespace henhouse::db
         const auto variance = second_mean - mean_squared;
 
         return diff_result 
-        { 
+        {
+            ta,
+            tb,
             resolution,
-                index_offset,
-                sum, 
-                mean, 
-                variance,
-                n,
-                a,
-                b,
+            index_offset,
+            sum,
+            mean,
+            variance,
+            n,
+            a,
+            b,
         };
     }
 
@@ -178,16 +187,16 @@ namespace henhouse::db
         auto last_bucket = data.back();
 
         //diff the two buckets
-        auto diff = diff_buckets(resolution, 0, first_bucket, last_bucket, n);
+        auto diff = diff_buckets(from, to, resolution, 0, first_bucket, last_bucket, n);
         return summary_result 
         {
             from,
-                to,
-                resolution,
-                diff.sum, 
-                diff.mean, 
-                diff.variance,
-                n
+            to,
+            resolution,
+            diff.sum,
+            diff.mean,
+            diff.variance,
+            n
         };
     }
 
@@ -229,7 +238,7 @@ namespace henhouse::db
         CHECK_GREATER(resolution, 0);
 
         if(a > b) std::swap(a,b);
-        if(data.size() == 0) return diff_result{ resolution, 0, 0, 0, 0, 0, {0}, {0}};
+        if(data.size() == 0) return diff_result{ a, b, resolution, 0, 0, 0, 0, 0, {0}, {0}};
 
         auto ar = get(a, index_offset);
         auto br = get(b, index_offset);
@@ -240,11 +249,11 @@ namespace henhouse::db
         const auto time_diff = b - a;
         auto n = time_diff / resolution;
 
-        if(n == 0) return diff_result{ resolution, 0, 0, 0, 0, 0, ar.value, br.value};
+        if(n == 0) return diff_result{ a, b, resolution, 0, 0, 0, 0, 0, ar.value, br.value};
 
         CHECK_GREATER(n , 0);
         CHECK_LESS_EQUAL(ar.index_offset, br.index_offset);
-        return diff_buckets(resolution, ar.index_offset, ar.value, br.value, n);
+        return diff_buckets(a, b, resolution, ar.index_offset, ar.value, br.value, n);
     }
 
     timeline from_directory(const std::string& path, const time_type resolution) 

@@ -478,7 +478,7 @@ namespace henhouse::net
                             e << "the segment size " << segment_size << " is too small for the key \"" << r.key << "\" , must be bigger than " << v.resolution;
                             throw bad_request( e.str() );
                         }
-                        render_value(rb, a, extract_value(v));
+                        render_value(rb, v.a, extract_value(v));
                         rb.body(",");
                         //50 here should roughly be 1k for xy request, though likely larger.
                         //TODO don't use RequestBuilder, do it yourself.
@@ -486,7 +486,8 @@ namespace henhouse::net
                     }
 
                     //output last
-                    render_value(rb, b, extract_value(r.results[r.results.size() - 1].get()));
+                    const auto lv = r.results[r.results.size() -1].get();
+                    render_value(rb, lv.a, extract_value(lv));
                 }
 
         private:

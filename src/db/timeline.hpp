@@ -139,6 +139,8 @@ namespace henhouse::db
 
     struct diff_result
     {
+        time_type a;                //request from time
+        time_type b;                //request to time
         time_type resolution;       //resolution of smallest bucket
         offset_type index_offset;   //used for faster retrieval of a range of values
         count_type sum;             //values added within time range
