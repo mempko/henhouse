@@ -85,7 +85,7 @@ buckets.
   [1491371283, 1491371284, 1491371285]
 `
 
-Above payload will return two results, one from 1491371283 to 1491371284 and another from 1491371284 to 1491371284
+Above payload will return two results, one from 1491371283 to 1491371284 and another from 1491371284 to 1491371285
 
 ### response
 
