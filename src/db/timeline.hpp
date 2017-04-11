@@ -44,7 +44,6 @@ namespace henhouse::db
 
     const std::size_t DATA_SIZE = util::PAGE_SIZE;
     const std::size_t INDEX_SIZE = util::PAGE_SIZE;
-    const std::size_t FRAME_SIZE = DATA_SIZE / sizeof(data_item);
 
     struct pos_result
     {
