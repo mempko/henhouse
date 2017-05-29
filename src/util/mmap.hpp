@@ -1,5 +1,5 @@
-#ifndef FLYFISH_MMAP_H
-#define FLYFISH_MMAP_H
+#ifndef HENHOUSE_MMAP_H
+#define HENHOUSE_MMAP_H
 
 #include "util/dbc.hpp"
 

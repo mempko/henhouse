@@ -1,5 +1,5 @@
-#ifndef FLYFISH_QUERY_SERV_H
-#define FLYFISH_QUERY_SERV_H
+#ifndef HENHOUSE_QUERY_SERV_H
+#define HENHOUSE_QUERY_SERV_H
 
 #include "service/threaded.hpp"
 

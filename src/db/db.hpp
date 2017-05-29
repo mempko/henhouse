@@ -1,5 +1,5 @@
-#ifndef FLYFISH_DB_H
-#define FLYFISH_DB_H
+#ifndef HENHOUSE_DB_H
+#define HENHOUSE_DB_H
 
 #include "db/timeline.hpp"
 

@@ -1,5 +1,5 @@
-#ifndef FLYFISH_TIMELINE_H
-#define FLYFISH_TIMELINE_H
+#ifndef HENHOUSE_TIMELINE_H
+#define HENHOUSE_TIMELINE_H
 
 #include "util/dbc.hpp"
 #include "util/mapped_vector.hpp"

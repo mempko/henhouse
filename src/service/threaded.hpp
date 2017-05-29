@@ -1,5 +1,5 @@
-#ifndef FLYFISH_THREADED_H
-#define FLYFISH_THREADED_H
+#ifndef HENHOUSE_THREADED_H
+#define HENHOUSE_THREADED_H
 
 #include <experimental/string_view>
 #include <iostream>
