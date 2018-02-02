@@ -1,10 +1,9 @@
+
+**FoxCommerce has be acquired by the [SHOP Cooperative](https://shoppers.shop)!**
+
+**Henhouse is still in active use and its development is being maintained as part of the [SHOP Protocol](https://github.com/ShoppersShop). Keep up with active development [here](https://github.com/ShoppersShop/henhouse).**
+
 # Henhouse
-
-**FoxCommerce has be acquired by the [SHOP Cooperative](https://shoppers.shop)!
-
-Henhouse is still in active use and its development is being maintained as part
-of the [SHOP Protocol](https://github.com/ShoppersShop). Keep up with active
-development [here](https://github.com/ShoppersShop/henhouse).**
 
 Henhouse is a fast time series DB that can compute sum, average, and variance 
 between any two time ranges in **basically** constant time. 
@@ -41,9 +40,14 @@ You can read about how to use these services [here](src/service/README.md)
 | [tests](tests)                         | Tests to Hammer Henhouse with Good and Bad Queries |
 | [tools](tests)                         | Misc Tools to work with Henhouse |
 
-# Authors
+# Contributors
 
-Maxim Khailo ([@mempko](https://github.com/mempko))
+Henhouse was designed and authored by Maxim Khailo ([@mempko](https://github.com/mempko)).
+
+It is currently maintained by Jeff Mataya ([@jmataya](https://github.com/jmataya)).
+
+You can participate in the continued development of Henhouse in its [new home](https://github.com/ShoppersShop/henhouse)
+in the SHOP Protocol.
 
 # License
 
