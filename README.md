@@ -49,9 +49,6 @@ peer review, testing, and patches.
 
 For more details about how to get involved, see our [Contribution Guide](CONTRIBUTING.md).
 
-You can participate in the continued development of Henhouse in its [new home](https://github.com/ShoppersShop/henhouse)
-in the SHOP Protocol.
-
 # License
 
 MIT
