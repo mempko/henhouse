@@ -22,11 +22,11 @@ include_directories(
 
 set(MISC_LIBRARIES
     librt.so
-    libproxygenhttpserver.a
-    libproxygenlib.a
+    proxygenhttpserver
+    proxygenlib
     libz.a
-    libwangle.a
-    libfolly.a
+    wangle
+    folly
     libevent.a
     libpthread.so
     libboost_context.a
