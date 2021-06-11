@@ -4,7 +4,7 @@
 #include "db/timeline.hpp"
 
 #include <experimental/string_view>
-#include <folly/EvictingCacheMap.h>
+#include <folly/container/EvictingCacheMap.h>
 
 namespace stde = std::experimental;
 
